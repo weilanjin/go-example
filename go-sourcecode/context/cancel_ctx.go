@@ -6,6 +6,7 @@ import (
 )
 
 // 同时也会取消子 ctx
+// 实现了 canceler 和 Context 接口
 type cancelCtx struct {
 	Context
 	mu       sync.Mutex
@@ -41,6 +42,7 @@ func value(c Context, key any) any {
 	}
 }
 
+// Done return chan struct{}
 func (c *cancelCtx) Done() <-chan struct{} {
 	d := c.done.Load()
 	if d != nil {
@@ -63,6 +65,55 @@ func (c *cancelCtx) Err() error {
 	return err
 }
 
+// c.done
+// 关闭每一个子节点
 func (c *cancelCtx) cancel(removeFormParent bool, err error) {
+	c.mu.Lock()
+	if c.err != nil {
+		c.mu.Unlock()
+		return // 已经取消
+	}
+	c.err = err
+	d, _ := c.done.Load().(chan struct{})
+	if d == nil {
+		c.done.Store(make(chan struct{}))
+	} else {
+		close(d)
+	}
+	for child := range c.children {
+		child.cancel(false, err)
+	}
+	c.children = nil
+	c.mu.Unlock()
+	if removeFormParent {
+		removeChild(c.Context, c)
+	}
+}
 
+func removeChild(parent Context, child canceler) {
+	p, ok := parentCancelCtx(parent)
+	if !ok {
+		return
+	}
+	p.mu.Lock()
+	if p.children != nil {
+		delete(p.children, child)
+	}
+	p.mu.Unlock()
+}
+
+func parentCancelCtx(parent Context) (*cancelCtx, bool) {
+	done := parent.Done()
+	if done == nil || done == make(chan struct{}) {
+		return nil, false
+	}
+	p, ok := parent.Value(&cancelCtxKey).(*cancelCtx)
+	if !ok {
+		return nil, false
+	}
+	pdone, _ := p.done.Load().(chan struct{})
+	if pdone != done {
+		return nil, false
+	}
+	return p, true
 }
