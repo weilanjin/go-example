@@ -2,6 +2,8 @@
 
 Package context src/context/context.go
 
+![继承关系](https://raw.githubusercontent.com/weilanjin/diagram/main/go/context/context.drawio.png)
+
 emptyCtx 是 parent context
 
 WithTimeout 用法
