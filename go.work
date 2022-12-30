@@ -1,8 +1,10 @@
 go 1.18
 
 use (
+	./client-go
 	./design-pattern
 	./example
+	./go-sourcecode
 	./leetcode
 	./web-framework
 )

@@ -5,8 +5,8 @@ import (
 )
 
 // Context implementations
-// cancelCtx
 // emptyCtx
+// cancelCtx
 // timerCtx
 // valueCtx
 //
