@@ -4,7 +4,9 @@ use (
 	./client-go
 	./design-pattern
 	./example
+	./go-case
 	./go-sourcecode
 	./leetcode
+	./pkg
 	./web-framework
 )
