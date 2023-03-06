@@ -1,28 +1,26 @@
 package synchronize
 
 import (
-	"log"
-	"runtime"
+	"fmt"
 	"strconv"
 	"sync"
 	"testing"
-	"time"
+
+	"lovec.wlj/pkg/mem"
 )
 
 func TestMapGC(t *testing.T) {
-
 	m := sync.Map{}
+	begin := mem.MemConsumed()
 	for i := 0; i < 3000000; i++ {
 		m.Store(i, "map_gc"+strconv.Itoa(i))
 	}
-
+	before := mem.MemConsumed()
 	for i := 0; i < 2000000; i++ {
 		m.Delete(i)
 	}
-
-	runtime.GC()
-	log.Println("gc ------ 1")
-	time.Sleep(time.Second * 8)
-	log.Println("gc ------ 2")
-	time.Sleep(time.Second * 8)
+	after := mem.MemConsumed()
+	fmt.Printf("begin memory %.3fkb\n", float64(begin)/1024)
+	fmt.Printf("store() memory %.3fkb\n", float64(before)/1024)
+	fmt.Printf("delete() memory %.3fkb\n", float64(after)/1024)
 }

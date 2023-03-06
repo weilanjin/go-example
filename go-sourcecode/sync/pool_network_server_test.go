@@ -11,9 +11,23 @@ import (
 )
 
 // 模拟连接 service
+// BenchmarkNetworkRequest-12    	       1	1324852100 ns/op
 func connectToService() any {
 	time.Sleep(1 * time.Second)
 	return struct{}{}
+}
+
+// BenchmarkNetworkRequest-12    	       1	1318927100 ns/op
+
+func warmServiceConnCache() *sync.Pool {
+	p := &sync.Pool{
+		New: connectToService,
+	}
+
+	for i := 0; i < 10; i++ {
+		p.Put(p.New())
+	}
+	return p
 }
 
 // run http server
@@ -22,6 +36,7 @@ func startNetworkDaemon() *sync.WaitGroup {
 	wg.Add(1)
 
 	go func() {
+		connPool := warmServiceConnCache()
 		server, err := net.Listen("tcp", "localhost:8080")
 		if err != nil {
 			log.Fatalf("cannot listen: %v", err)
@@ -34,8 +49,12 @@ func startNetworkDaemon() *sync.WaitGroup {
 				log.Printf("cannot accept connect: %v", err)
 				continue
 			}
-			connectToService()
+			// not pool
+			// connectToService()
+			// have pool
+			svcConn := connPool.Get()
 			fmt.Fprintln(conn, "")
+			connPool.Put(svcConn)
 			conn.Close()
 		}
 	}()
