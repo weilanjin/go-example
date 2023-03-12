@@ -33,3 +33,13 @@ loop:
 
 	fmt.Printf("Achieved %v cycles of work before signalled to stop.\n", workCounter)
 }
+
+type foo int
+type bar int
+
+func TestXxx(t *testing.T) {
+	m := make(map[any]int)
+	m[foo(1)] = 2
+	m[bar(1)] = 3
+	fmt.Println(m)
+}
