@@ -1,4 +1,4 @@
-package error_test
+package er
 
 import "os/exec"
 
