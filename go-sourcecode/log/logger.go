@@ -9,7 +9,7 @@ import (
 const prefix = "[Server] "
 
 func init() {
-	log.SetFlags(log.Ldate | log.Lmicroseconds | log.Lshortfile)
+	log.SetFlags(log.Ldate | log.Lmicroseconds | log.Llongfile)
 
 	// 可选
 	file := openFile("server.log")
@@ -18,17 +18,17 @@ func init() {
 }
 
 func Debug(msg string) {
-	log.SetPrefix(prefix + "DEBUG ")
+	log.SetPrefix(prefix + Magenta.Add("DEBUG") + " ")
 	log.Output(2, msg)
 }
 
 func Info(msg string) {
-	log.SetPrefix(prefix + "INFO  ")
+	log.SetPrefix(prefix + Blue.Add("INFO") + " ")
 	log.Output(2, msg)
 }
 
 func Error(msg string) {
-	log.SetPrefix(prefix + "ERROR ")
+	log.SetPrefix(prefix + Red.Add("ERROR") + " ")
 	log.Output(2, msg)
 }
 

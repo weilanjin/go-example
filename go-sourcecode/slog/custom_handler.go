@@ -18,7 +18,7 @@ func NewChannelHandler(ch chan []byte, opts *slog.HandlerOptions) *ChannelHandle
 		buf: bytes.NewBuffer(b),
 		ch:  ch,
 	}
-	h.Handler = slog.NewJSONHandler(h.buf, opts)
+	h.Handler = slog.NewTextHandler(h.buf, opts)
 	return h
 }
 
