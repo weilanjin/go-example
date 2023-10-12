@@ -21,3 +21,13 @@ func TestRecover(t *testing.T) {
 
 // output:
 //       2 1
+
+func fp() {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
+		}
+	}()
+	panic(1) // 下面的 panic 不会执行
+	panic(2)
+}

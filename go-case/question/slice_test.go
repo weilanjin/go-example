@@ -45,3 +45,33 @@ func TestSlice3(t *testing.T) {
 	s2 := s[4:8]
 	fmt.Println(len(s2)) // 4
 }
+
+func TestSlice4(t *testing.T) {
+	a := [3]int{0, 1, 2}
+	s := a[1:2]
+
+	s[0] = 11
+	s = append(s, 12)
+	s = append(s, 13)
+	s[0] = 21
+
+	fmt.Println(a) // [0, 11, 12]
+	fmt.Println(s) // [21, 12, 13]
+}
+
+func TestSlice5(t *testing.T) {
+	var src, dst []int
+	src = []int{1, 2, 3}
+	// dst = make([]int, len(src))
+	// 或者
+	// dst = append(src, src...)
+	copy(dst, src)
+	// dst 必须分配足够的空间
+	fmt.Println(dst) // []
+}
+
+func TestSlice6(t *testing.T) {
+	s := []int{0, 1}
+	// 对一个切片执行[i,j]的时候, i 和 j都不能超过切片的长度值
+	fmt.Println(s[len(s):]) // []
+}

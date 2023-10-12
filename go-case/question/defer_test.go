@@ -120,3 +120,51 @@ func TestDefer3(t *testing.T) {
 
 // output:
 //  7 6 8
+
+// -------------------
+func deferTest1(i int) (r int) {
+	r = i
+	defer func() {
+		r += 3 // 1 + 3
+	}()
+	return r // 1
+}
+
+func deferTest2(i int) (r int) {
+	defer func() {
+		r += 1 // 2 + 1
+	}()
+	return 2
+}
+
+func TestDefer4(t *testing.T) {
+	fmt.Println(deferTest1(1)) // 4
+	fmt.Println(deferTest2(1)) // 3
+}
+
+// ------------------
+
+type Slice []int
+
+func NewSlice() Slice {
+	return make(Slice, 0)
+}
+
+func (s *Slice) Add(elem int) *Slice {
+	*s = append(*s, elem)
+	fmt.Println(elem)
+	return s
+}
+
+func TestDefer5(t *testing.T) {
+	s := NewSlice()
+	//  defer 先执行第一个Add, 第二个放入栈执行缓存 return 后执行
+	defer s.Add(1).Add(2)
+
+	defer func() {
+		s.Add(11).Add(22) // return 后执行
+	}()
+	s.Add(3)
+}
+
+// output: 1 3 11 12 2
