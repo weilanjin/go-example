@@ -2,8 +2,14 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
 )
+
+// go get -u github.com/spf13/cobra
+
+// cobra-cli 模版生成
+// go install github.com/spf13/cobra-cli@latest
 
 var rootCmd = &cobra.Command{
 	Use:   "go",
