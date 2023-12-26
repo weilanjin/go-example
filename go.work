@@ -9,4 +9,5 @@ use (
 	./leetcode
 	./pkg
 	./web-framework
+	./go-ai
 )

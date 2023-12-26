@@ -17,7 +17,7 @@ func TestDefault(t *testing.T) {
 	lvl.Set(slog.LevelError)
 
 	writerFile := readFile("./foo.log")
-	logger := slog.New(slog.NewJSONHandler(io.MultiWriter(os.Stderr, writerFile), &slog.HandlerOptions{
+	logger := slog.New(slog.NewTextHandler(io.MultiWriter(os.Stderr, writerFile), &slog.HandlerOptions{
 		AddSource: true,
 		Level:     lvl,
 		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
@@ -35,7 +35,6 @@ func TestDefault(t *testing.T) {
 		},
 	}))
 	slog.SetDefault(logger)
-
 	slog.Debug("Debug level logging", "level", "debug")
 	slog.Info("info level logging", slog.String("level", "info"))
 	slog.Warn("Warn level logging", "level", "warn")

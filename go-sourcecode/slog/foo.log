@@ -1,0 +1,3 @@
+time="2023-11-06 23:47:16.673" level=ERROR source=default_test.go:41 msg="Error level logging" level=error
+time="2023-11-06 23:47:16.673" level=DEBUG source=default_test.go:43 msg="Debug level logging"
+time="2023-11-06 23:47:16.673" level=DEBUG source=add.go:6 msg="a + b = " value=26
