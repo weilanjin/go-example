@@ -12,7 +12,7 @@ var f *os.File
 func init() {
 	var err error
 	// 打开只读
-	f, err = os.Open("basic_operation_test.go") // OpenFile(name, O_RDONLY, 0)
+	f, err = os.Open("basic_test.go") // OpenFile(name, O_RDONLY, 0)
 	if err != nil {
 		panic(err)
 	}
