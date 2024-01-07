@@ -22,7 +22,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/redis/go-redis/v9 v9.0.5 // indirect
+	github.com/redis/go-redis/v9 v9.3.1 // indirect
 	github.com/spf13/cobra v1.7.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.etcd.io/etcd v3.3.27+incompatible
