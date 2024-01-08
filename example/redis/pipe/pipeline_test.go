@@ -1,11 +1,10 @@
-package test
+package pipe
 
 import (
 	"context"
+	"github.com/redis/go-redis/v9"
 	"log"
 	"testing"
-
-	"github.com/go-redis/redis/v8"
 )
 
 var rdb *redis.Client
