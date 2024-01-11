@@ -45,3 +45,9 @@ func TestListQueueConsume(t *testing.T) {
 		<-ticker.C
 	}
 }
+
+func TestMget(t *testing.T) {
+	result, err := rdb.MGet(context.Background(), "go2", "go1").Result()
+	fmt.Println("result:", result)
+	fmt.Println("err:", err)
+}

@@ -3,11 +3,17 @@ package scan
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/redis/go-redis/v9"
+	"lovec.wlj/example/redis/initialize"
 	"testing"
 )
+
+var rdb redis.UniversalClient
+
+func init() {
+	rdb = initialize.Redis()
+}
 
 type Model struct {
 	Str1    string   `redis:"str1"`
@@ -15,17 +21,6 @@ type Model struct {
 	Int     int      `redis:"int"`
 	Bool    bool     `redis:"bool"`
 	Ignored struct{} `redis:"-"`
-}
-
-var rdb redis.UniversalClient
-
-func init() {
-	rdb = redis.NewUniversalClient(&redis.UniversalOptions{})
-	ping, err := rdb.Ping(context.Background()).Result()
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("ping:", ping)
 }
 
 func TestScan1(t *testing.T) {

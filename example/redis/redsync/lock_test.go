@@ -3,7 +3,7 @@ package redsync
 import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v9"
-	goredislib "github.com/redis/go-redis/v9"
+	"lovec.wlj/example/redis/initialize"
 	"sync"
 	"testing"
 	"time"
@@ -14,10 +14,8 @@ func TestDistributedLock(t *testing.T) {
 	// Create a pool with go-redis (or redigo) which is the pool redisync will
 	// use while communicating with Redis. This can also be any pool that
 	// implements the `redis.Pool` interface.
-	client := goredislib.NewClient(&goredislib.Options{
-		Addr: "localhost:6379",
-	})
-	pool := goredis.NewPool(client) // or, pool := redigo.NewPool(...)
+	rdb := initialize.Redis()
+	pool := goredis.NewPool(rdb) // or, pool := redigo.NewPool(...)
 
 	// Create an instance of redisync to be used to obtain a mutual exclusion
 	// lock.

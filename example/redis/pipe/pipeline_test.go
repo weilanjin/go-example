@@ -4,21 +4,19 @@ import (
 	"context"
 	"github.com/redis/go-redis/v9"
 	"log"
+	"lovec.wlj/example/redis/initialize"
 	"testing"
 )
 
-var rdb *redis.Client
+var rdb redis.UniversalClient
 
 func init() {
-	rdb = redis.NewClient(&redis.Options{
-		Addr:     "192.168.137.100:7000",
-		DB:       0,
-		PoolSize: 10,
-	})
+	rdb = initialize.Redis()
 }
 
 func TestPipeline(t *testing.T) {
 	ctx := context.Background()
+	// rdb.MGet(ctx, "username", "age", "address", "python", "xxx")
 	cmds, err := rdb.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		pipe.Get(ctx, "username")
 		pipe.Get(ctx, "age")
