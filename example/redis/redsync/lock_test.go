@@ -1,3 +1,4 @@
+// https://redis.io/docs/manual/patterns/distributed-locks/
 package redsync
 
 import (
