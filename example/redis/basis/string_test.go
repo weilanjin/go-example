@@ -26,9 +26,33 @@ import (
 	| append key value               | O(1)                                           |
 	| strlen key                     | O(1)                                           |
 	| strange key offset value       | O(1)                                           |
-	| getrange key start end         | 0(n)，n是字符串长度，由于获取字符串非常快，所以如果字符串不是很长，可以视同为 0(1) |
+	| getrange key start end         | O(n)，n是字符串长度，由于获取字符串非常快，所以如果字符串不是很长，可以视同为 O(1) |
 	+--------------------------------+------------------------------------------------+
+
+	例子
+		1. 缓存用户信息
+		2. 计数
+		3. 共享session
+		4. 限速 - 短信
 */
+
+// 三种内部编码
+//
+//	1.int:    8个字节的长整型。
+//	2.embstr: <=39个字节的字符串。
+//	3.raw:    >39个字节的字符串。
+func TestStringObject(t *testing.T) {
+	// =================================================================
+	// object encoding key
+	// ================================================================
+	rdb.Set(ctx, "key:int", 1994, 0)
+	rdb.Set(ctx, "embstr39", "hello world", 0) // int
+	rdb.Set(ctx, "raw39", "Println calls Output to print to the standard logger........", 0)
+
+	log.Println(rdb.ObjectEncoding(ctx, "key:int"))  // int
+	log.Println(rdb.ObjectEncoding(ctx, "embstr39")) // embster
+	log.Println(rdb.ObjectEncoding(ctx, "raw39"))    // raw
+}
 
 func TestString(t *testing.T) {
 
@@ -42,6 +66,7 @@ func TestString(t *testing.T) {
 
 	// gset k1 k2 一次性获取 v (按照 key 的顺序返回)
 	// 如没有值，对应的位置就会返回 nil
+	// TODO 集群模式下是否要遍历？
 	mGet := rdb.MGet(ctx, "user1", "user2", "user23")
 
 	log.Println(mGet)

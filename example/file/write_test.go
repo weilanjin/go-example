@@ -35,8 +35,7 @@ func TestBufioWiter(t *testing.T) {
 	bufWr := bufio.NewWriter(f) // 默认 4096 bufio.NewWriterSize(w io.Writer, size int) 可以指定buf大小
 	bufWr.WriteString("你好")
 	// 还有多少字节可用
-	fmt.Printf("Bytes buffered: %d\n", bufWr.Buffered()) // 6
+	fmt.Printf("Bytes buffered: %d\n", bufWr.Buffered())    // 6
 	fmt.Printf("Available buffer: %d\n", bufWr.Available()) // 4090
 	bufWr.Flush()
 }
-
