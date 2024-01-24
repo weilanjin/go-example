@@ -2,6 +2,7 @@ package basis
 
 import (
 	"log"
+	"strconv"
 	"testing"
 
 	"github.com/redis/go-redis/v9"
@@ -40,6 +41,27 @@ import (
 // 			放数量、
 //			按照获得的赞数
 
+// 三种内部编码
+//
+//	listpack、skiplist、hashtable
+//		- skiplist 当元素个数超过128个
+func TestZSetObject(t *testing.T) {
+	rdb.ZAdd(ctx, "zsetkey",
+		redis.Z{Member: "e1", Score: 50},
+		redis.Z{Member: "e2", Score: 100},
+		redis.Z{Member: "e3", Score: 150},
+	)
+	log.Println(rdb.ObjectEncoding(ctx, "zsetkey")) // listpack
+
+	// 元素个数超过128个，使用 skiplist
+	var rank []redis.Z
+	for i := 0; i <= 129; i++ {
+		rank = append(rank, redis.Z{Member: "e" + strconv.Itoa(i), Score: float64(i + 100)})
+	}
+	rdb.ZAdd(ctx, "zsetkey128", rank...)
+	log.Println(rdb.ObjectEncoding(ctx, "zsetkey128")) // skiplist
+}
+
 func TestZSet(t *testing.T) {
 	members := []redis.Z{
 		{Member: "kris", Score: 1},
@@ -76,4 +98,18 @@ func TestZSet(t *testing.T) {
 	// zrangebyscore key min max [withscores] [limit offset count]
 	// zrevrangebyscore key max min [withscores] [limit offset count]
 	// ============================================================
+}
+
+func TestUserThumbNum(t *testing.T) {
+	// 例子 用户点赞数
+	// 用户 kris 上传了一个视频，并获得了 100 点的点赞数
+	rdb.ZAdd(ctx, "user:thumb:202402", redis.Z{Member: "kris", Score: 100})
+	// 之后再获得一个赞
+	rdb.ZIncrBy(ctx, "user:thumb:202402", 1, "kris")
+	// 点错了
+	rdb.ZIncrBy(ctx, "user:thumb:202402", -1, "kris")
+	// 用户作弊取消作品
+	rdb.ZRem(ctx, "user:thumb:202402", "kris")
+	// 展示👍最多的前十位
+	rdb.ZRevRangeWithScores(ctx, "zsetkey128", 0, 9)
 }
