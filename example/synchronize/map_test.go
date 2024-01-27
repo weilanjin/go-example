@@ -2,11 +2,10 @@ package synchronize
 
 import (
 	"fmt"
+	"lovec.wlj/pkg/mem"
 	"strconv"
 	"sync"
 	"testing"
-
-	"lovec.wlj/pkg/mem"
 )
 
 func TestMapGC(t *testing.T) {
