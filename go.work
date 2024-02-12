@@ -1,13 +1,13 @@
-go 1.18
+go 1.22
 
 use (
 	./client-go
 	./design-pattern
 	./example
+	./go-ai
 	./go-case
 	./go-sourcecode
 	./leetcode
 	./pkg
 	./web-framework
-	./go-ai
 )
