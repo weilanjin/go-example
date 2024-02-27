@@ -8,7 +8,7 @@ import (
 	"fmt"
 )
 
-// --- 加密解密 ---
+// --- AES加密解密 ---
 
 /*
 	前端代码实现
@@ -31,7 +31,7 @@ import (
 
 */
 
-func AesEncrypt(plaintext, key string) (string, error) {
+func AESEncrypt(plaintext, key string) (string, error) {
 	pb, kb := []byte(plaintext), []byte(key)
 	// 秘钥块
 	bl, err := aes.NewCipher(kb)
@@ -46,12 +46,16 @@ func AesEncrypt(plaintext, key string) (string, error) {
 	cpb := make([]byte, len(pb))
 	// 加密
 	bm.CryptBlocks(cpb, pb)
-	//使用RawURLEncoding 不要使用StdEncoding
-	//不要使用StdEncoding  放在url参数中会导致错误
 	return hex.EncodeToString(cpb), nil
 }
 
-func AesDecrypt(ciphertext, key string) (string, error) {
+func AESDecrypt(ciphertext, key string) (pt string, err error) {
+	// panic recover bm.CryptBlocks
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%s", r)
+		}
+	}()
 	ctb, err := hex.DecodeString(ciphertext)
 	if err != nil {
 		return "", err
@@ -61,7 +65,7 @@ func AesDecrypt(ciphertext, key string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("key 长度必须 16|24|32长度: %s", err)
 	}
-	bm := cipher.NewCBCDecrypter(bl, kb[:bl.BlockSize()]) // 前端代码对应: mode: CryptoJS.mode.CBC,// CBC算法
+	bm := cipher.NewCBCDecrypter(bl, kb) // 前端代码对应: mode: CryptoJS.mode.CBC,// CBC算法
 	ptb := make([]byte, len(ctb))
 	bm.CryptBlocks(ptb, ctb)
 	ptb = pkcs7UnPadding(ptb) // 前端代码对应:  padding: CryptoJS.pad.Pkcs7

@@ -14,22 +14,43 @@ func TestBase64(t *testing.T) {
 	plaintext, err := base64.StdEncoding.DecodeString(ciphertext)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 	t.Logf("%s", plaintext)
 }
 
-func TestAes(t *testing.T) {
-	key := "1234567890123456"
+func TestAES(t *testing.T) {
+	key := "1234567890123456" // 16、24、32 位
 	raw := "hello world"
 	t.Log(raw)
-	ciphertext, err := ucrypto.AesEncrypt(raw, key)
+	ciphertext, err := ucrypto.AESEncrypt(raw, key)
 	if err != nil {
 		t.Error(err)
+		return
 	}
 	t.Log(ciphertext)
-	plaintext, err := ucrypto.AesDecrypt(ciphertext, key)
+	plaintext, err := ucrypto.AESDecrypt(ciphertext, key)
 	if err != nil {
 		t.Error(err)
+		return
+	}
+	t.Log(plaintext)
+}
+
+func TestDES(t *testing.T) {
+	key := "12345678" // 8 位
+	raw := "hello world"
+	t.Log(raw)
+	ciphertext, err := ucrypto.DESEncrypt(raw, key)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(ciphertext)
+	plaintext, err := ucrypto.DESDecrypt(ciphertext, key)
+	if err != nil {
+		t.Error(err)
+		return
 	}
 	t.Log(plaintext)
 }
