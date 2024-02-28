@@ -7,7 +7,7 @@
 // 2. 非对称加密(公钥加密,私钥解密) RSA
 // 3. 签名算法(验证,防止信息被修改) MD5,SHA1,HMAC
 //
-// 1.base64  任意二进制 -> 文本的编码 「不是加密算法」
+//  1. base64  任意二进制 -> 文本的编码 「不是加密算法」
 //
 // a.编码需要 64个字符表 base64.StdEncoding [+/] base64.URLEncoding [-_]
 // b.大小写+数字+[+/ | -_] = 26 + 26 + 10 + 2 = 64个字符表
@@ -19,7 +19,8 @@
 //
 // 常用于: URL,Cookie,网页中传输少量二进制数据.
 //
-// 2.AES Advanced Encryption Standard (高级加密标准) -- 对称分组密码算法
+//  2. AES Advanced Encryption Standard (高级加密标准) -- 对称分组密码算法
+//
 // a. 加密过程 4种操作:
 // 1. 字节替代（SubBytes)
 // 2. 行移位（ShiftRows）
@@ -40,4 +41,11 @@
 //     两种种加密模式
 //     1.ECB（电子密码本）
 //     2.CBC（加密块）
+//
+//  4. RSA
+//     使用openssl生成公私钥
+//
+//  5. MD5的全称是Message-DigestAlgorithm 5
+//     1.把一个任意长度的字节数组转换成一个定长的整数
+//     2.并且这种转换是不可逆的.对于任意长度的数据
 package ucrypto

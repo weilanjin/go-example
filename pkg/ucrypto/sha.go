@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 )
 
+// --- SHA签名 ---
+
 func SHA1(data string) string {
 	h := sha1.New()
 	h.Write([]byte(data))

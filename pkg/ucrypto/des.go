@@ -7,7 +7,7 @@ import (
 	"errors"
 )
 
-// --- DES加密解密 ---
+// --- DES加密解密(对称) ---
 
 func DESEncrypt(text, key string) (string, error) {
 	src, kb := []byte(text), []byte(key)

@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 )
 
+// --- MD5签名 ---
+
 func MD5(data string) string {
 	h := md5.New()
 	h.Write([]byte(data))
