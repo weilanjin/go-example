@@ -1,6 +1,9 @@
 package iface
 
-import "runtime/debug"
+import (
+	"runtime/debug"
+	"strings"
+)
 
 // Logger is logger interface
 type Logger interface {
@@ -19,6 +22,7 @@ func (f LoggerFunc) Printf(format string, args ...any) {
 func Recovery(logger Logger) {
 	if err := recover(); err != nil {
 		logger.Printf("handle recovery error: %v", err)
-		logger.Printf("full_stack:%s", string(debug.Stack()))
+		ss := strings.SplitN(string(debug.Stack()), "\n", 8)
+		logger.Printf("full_stack:\n %s", ss[len(ss)-1])
 	}
 }
