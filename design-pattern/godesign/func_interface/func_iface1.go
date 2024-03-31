@@ -23,6 +23,6 @@ func Recovery(logger Logger) {
 	if err := recover(); err != nil {
 		logger.Printf("handle recovery error: %v", err)
 		ss := strings.SplitN(string(debug.Stack()), "\n", 8)
-		logger.Printf("full_stack:\n %s", ss[len(ss)-1])
+		logger.Printf("panic_stack:\n %s", ss[len(ss)-1])
 	}
 }
