@@ -21,6 +21,7 @@ require (
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/btree v1.0.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/google/wire v0.6.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -43,7 +44,7 @@ require (
 	go.uber.org/zap/exp v0.2.0 // indirect
 	golang.org/x/crypto v0.20.0 // indirect
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
-	golang.org/x/sync v0.1.0 // indirect
+	golang.org/x/sync v0.6.0 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
 
