@@ -19,19 +19,20 @@ func TestShort(t *testing.T) {
 // 单元测试
 func TestUnit(t *testing.T) {
 	var dataset = []struct {
-		a   int
-		b   int
-		out int
+		name string // 测试用例名称
+		a    int
+		b    int
+		out  int
 	}{
-		{1, 2, 3},
-		{2, 3, 5},
-		{3, 4, 7},
-		{-9, 8, -1},
-		{0, 0, 0},
+		{"case1", 1, 2, 3},
+		{"case2", 2, 3, 5},
+		{"case3", 3, 4, 7},
+		{"case4", -9, 8, -1},
+		{"case5", 0, 0, 0},
 	}
 	for _, v := range dataset {
 		if sum := add(v.a, v.b); sum != v.out {
-			t.Errorf("case %d: expect %d", sum, v.out)
+			t.Errorf("[%s]case %d: expect %d", v.name, sum, v.out)
 		}
 	}
 }
