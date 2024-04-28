@@ -1,12 +1,14 @@
 package main
 
 import (
+	"fmt"
 	"math"
 	"regexp"
 	"strings"
 	"sync"
 	"text/template"
 	"time"
+	"unsafe"
 )
 
 // 参考地址 https://colobu.com/gotips/001.html
@@ -99,4 +101,43 @@ func init() {
 	str1 := "Hello"
 	str2 := "hello"
 	strings.EqualFold(str1, str2)
+}
+
+// 10. 结构体中的字段按照从大到小的顺序排列
+// -----------------------------------------------
+// 字段填充,内存对齐
+// https://github.com/dkorunic/betteralign?tab=readme-ov-file 可以加检查低效的对齐方式
+
+// 32 字节对齐
+type T1 struct {
+
+	//  +---++++
+	//  +-------
+	//  ++++++++
+	//  +-------
+
+	A byte  // 1 字节 + 3  	// 8 字节对齐
+	B int32 // 4 字节
+
+	C byte // 1 字节 + 7   // 8 字节对齐
+	// 8 字节对齐
+	D int64 // 8 字节       // 8 字节对齐
+	// 8 字节对齐
+	E byte // 1 字节 + 7   // 8 字节对齐
+}
+
+// 16 字节对齐 (优化)
+type T2 struct {
+	// ++++++++
+	// +++++++-
+	D int64 // 8 字节
+	B int32 // 4 字节
+	A byte  // 1 字节
+	C byte  // 1 字节
+	E byte  // 1 字节
+}
+
+func init() {
+	fmt.Println(unsafe.Sizeof(T1{})) // 32 bytes
+	fmt.Println(unsafe.Sizeof(T2{})) // 16 bytes
 }
