@@ -1,4 +1,11 @@
-github.com/natefinch/lumberjack/v3 v3.0.0-alpha h1:HZ2AJF20D1lo9S0F/rpgkFbPGam5dgR3X0KUtZA5mlY=
-github.com/natefinch/lumberjack/v3 v3.0.0-alpha/go.mod h1:rPTlHhMjhrvPAhqKh0FC57E0pXZoanrXgMDj4yv5wcM=
+github.com/PumpkinSeed/slog-context v0.1.1 h1:yBJ8pM61OVUneV9azUEOXaUcA7u0ijpt7j3JQlKOgZE=
+github.com/bluele/gcache v0.0.2 h1:WcbfdXICg7G/DGBh1PFfcirkWOQV+v077yF1pSy3DGw=
+github.com/cornelk/hashmap v1.0.8 h1:nv0AWgw02n+iDcawr5It4CjQIAcdMMKRrs10HOJYlrc=
+github.com/phsym/console-slog v0.3.1 h1:Fuzcrjr40xTc004S9Kni8XfNsk+qrptQmyR+wZw9/7A=
+github.com/samber/lo v1.38.1 h1:j2XEAqXKb09Am4ebOg31SpvzUTTs6EN3VfgeLUhPdXM=
+github.com/samber/slog-common v0.14.0 h1:g4TGALXmqogbJu3epRhjIWUJKSpgqB9VyN2OEnS8Wyg=
+github.com/samber/slog-multi v1.0.2 h1:6BVH9uHGAsiGkbbtQgAOQJMpKgV8unMrHhhJaw+X1EQ=
+github.com/samber/slog-sampling v1.4.0 h1:eshCdgnd/t4+zPyT0Q9KUEDXhEb3BZzJ6mxSl22JWMk=
+golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 h1:k/i9J1pBpvlfR+9QsetwPyERsqu1GIbi967PQMq3Ivc=
 gopkg.in/natefinch/lumberjack.v2 v2.2.1 h1:bBRl1b0OH9s/DuPhuXpNl+VtCaJXFZ5/uEFST95x9zc=
 gopkg.in/natefinch/lumberjack.v2 v2.2.1/go.mod h1:YD8tP3GAjkrDg1eZH7EGmyESg/lsYskCTPBJVb9jqSc=

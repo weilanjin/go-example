@@ -1,4 +1,4 @@
-go 1.22
+go 1.22.0
 
 use (
 	./client-go
@@ -6,6 +6,7 @@ use (
 	./example
 	./go-ai
 	./go-case
+	./go-grpc
 	./go-sourcecode
 	./leetcode
 	./pkg
