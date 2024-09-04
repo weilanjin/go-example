@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"math/rand"
@@ -64,7 +65,12 @@ func main() {
 
 func publish(msg string) {
 	log.Println(msg)
-	if err := channel.Publish(
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := channel.PublishWithContext(
+		ctx,
 		exchange,   // 默认的 exchange
 		routingKey, // routingKey
 		false,      // mandatory
