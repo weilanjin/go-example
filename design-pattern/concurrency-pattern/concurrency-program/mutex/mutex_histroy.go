@@ -7,14 +7,14 @@ import (
 // v 2008
 
 // CAS 操作, 当时还没有抽象出 atomic 包
-func cas(val *int32, old, new int32) bool
+func cas(val *int32, old, new int32) bool { return false }
 
 // semacquire 用来把调用者 goroutine 压入一个队列,并把此 goroutine 设置为阻塞状态
 // 主要用来处理不能获取到锁的 goroutine (waiter, 等待者)
-func semacquire(*int32)
+func semacquire(*int32) {}
 
 // semrelease 用来从队列中取出一个 goroutine, 唤醒它, 并获得到锁.
-func semrelease(*int32)
+func semrelease(*int32) {}
 
 // 互斥锁的结构
 
@@ -145,14 +145,14 @@ type Mutex2015 struct {
 	state int32
 }
 
-func runtime_canSpin(i int) bool
-func runtime_doSpin()
-func runtime_Semacquire(sema *int32)
-func runtime_Semrelease(s *uint32, handoff bool, skipframes int)
-func runtime_nanotime() int64
-func runtime_SemacquireMutex(s *uint32, lifo bool, skipframes int)
-func throw(s string)
-func fatal(s string)
+func runtime_canSpin(i int) bool                                   { return false }
+func runtime_doSpin()                                              {}
+func runtime_Semacquire(sema *int32)                               {}
+func runtime_Semrelease(s *uint32, handoff bool, skipframes int)   {}
+func runtime_nanotime() int64                                      { return 0 }
+func runtime_SemacquireMutex(s *uint32, lifo bool, skipframes int) {}
+func throw(s string)                                               {}
+func fatal(s string)                                               {}
 
 func (m *Mutex2015) Lock() {
 	// 快捷路径 幸运之路, 正好获取到锁
