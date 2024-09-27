@@ -38,7 +38,7 @@ type Map struct {
 	// 包含 map 中所有的元素, 包括新怎的元素
 	// 访问 dirty 字段必须加锁, 当未命中达到一定的次数后会把它转为 read 字段
 	dirty map[any]*entry
-	// 未命中的次数表示有多少次数是未命中的, (不存在的元素)
+	// 每次查询未命中的次数,表示有多少次数是未命中的, (不存在的元素)
 	misses int
 }
 
@@ -100,6 +100,18 @@ func (e *entry) tryExpungeLocked() (isExpunged bool) {
 	return p == expunged
 }
 
+func (e *entry) delete() (value any, ok bool) {
+	for {
+		p := e.p.Load()
+		if p == nil || p == expunged {
+			return nil, false
+		}
+		if e.p.CompareAndSwap(p, nil) {
+			return *p, true
+		}
+	}
+}
+
 func (m *Map) Swap(key, value any) (previous any, loaded bool) {
 	read := m.loadReadOnly() // 1.读取 read 字段,原子操作, 没有使用到锁mu.
 	// 2. 检查 read 字段是否包含这个key, 包含直接尝试交换
@@ -139,13 +151,13 @@ func (m *Map) Swap(key, value any) (previous any, loaded bool) {
 func (m *Map) Load(key any) (value any, ok bool) {
 	read := m.loadReadOnly()
 	e, ok := read.m[key]
-	if !ok && read.amended {
-		m.mu.Lock()
+	if !ok && read.amended { // 1. k 不存在read 字段中的场景,否则直接读取出来返回
+		m.mu.Lock() // 如果不存在 read字段中, 需要加锁
 		read = m.loadReadOnly()
 		e, ok = read.m[key]
-		if !ok && read.amended {
+		if !ok && read.amended { // 2.再次读取 双重检查
 			e, ok = m.dirty[key]
-			m.missLocked()
+			m.missLocked() // 3. 统计未命中次数
 		}
 		m.mu.Unlock()
 	}
@@ -155,12 +167,35 @@ func (m *Map) Load(key any) (value any, ok bool) {
 	return e.load()
 }
 
+// Delete 的核心逻辑改用 LoadAndDelete
+// 欧长坤 提出 # go#issue 33762
+func (m *Map) LoadAndDelete(key any) (value any, loaded bool) {
+	read := m.loadReadOnly()
+	e, ok := read.m[key]
+	if !ok && read.amended {
+		m.mu.Lock()
+		read = m.loadReadOnly()
+		e, ok = read.m[key]
+		if !ok && read.amended {
+			e, ok = m.dirty[key]
+			delete(m.dirty, key)
+			m.missLocked()
+		}
+		m.mu.Unlock()
+	}
+	if ok {
+		return e.delete()
+	}
+	return nil, false
+}
+
 func (m *Map) missLocked() {
 	m.misses++
-	if m.misses < len(m.dirty) {
+	if m.misses < len(m.dirty) { // 是否达到阀值
 		return
 	}
-	m.read.Store(&readOnly{m: m.dirty})
+	m.read.Store(&readOnly{m: m.dirty}) // 未命中次数过多,提升
+	// 重新开始
 	m.dirty = nil
 	m.misses = 0
 }
