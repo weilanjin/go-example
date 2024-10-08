@@ -33,6 +33,13 @@ type canceler interface {
 var Canceled = errors.New("context canceled")
 var cancelCtxKey int
 
+// closedchan is a reusable closed channel.
+var closedchan = make(chan struct{})
+
+func init() {
+	close(closedchan)
+}
+
 type cancelCtx struct {
 	Context
 
@@ -50,12 +57,82 @@ func newCancelCtx(parent context.Context) *cancelCtx {
 }
 
 func (c *cancelCtx) cancel(removeFromParent bool, err, cause error) {
+	if err == nil {
+		panic("context: internal error: missing cancel error")
+	}
+	if cause == nil {
+		cause = err
+	}
+	c.mu.Lock()
+	if c.err != nil {
+		c.mu.Unlock()
+		return // 已经被撤销过,直接返回即可
+	}
+	c.err = err
+	c.cause = cause
+	d, _ := c.done.Load().(chan struct{}) // 读取 done 这个 channel
+	if d == nil {
+		c.done.Store(closedchan) // 既然已经明确被撤销了, 那么直接使用一个已关闭的channel即可
+	} else {
+		close(d)
+	}
+	for child := range c.children { // 子 Context 也都要被撤销
+		child.cancel(false, err, cause)
+	}
+	c.children = nil
+	c.mu.Unlock()
 
+	if removeFromParent {
+		removeChild(c.Context, c) // 清空子 Context 列表
+	}
+}
+
+func removeChild(parent context.Context, child canceler) {
+	if s, ok := parent.(stopCtx); ok {
+		s.stop()
+		return
+	}
+	p, ok := parentCancelCtx(parent)
+	if !ok {
+		return
+	}
+	p.mu.Lock()
+	if p.children != nil {
+		delete(p.children, child)
+	}
+	p.mu.Unlock()
 }
 
 func (c *cancelCtx) Done() <-chan struct{} {
-	return nil
+	d := c.done.Load()
+	if d != nil { // 如果已经初始化done, 直接返回
+		return d.(chan struct{})
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	d = c.done.Load()
+	if d == nil { // 双重检查, 如果还没有初始化过,则初始化一个未关闭的 channel
+		d = make(chan struct{})
+		c.done.Store(d)
+	}
+	return d.(chan struct{})
 }
+
+func (c *cancelCtx) Err() error {
+	c.mu.Lock()
+	err := c.err
+	c.mu.Unlock()
+	return err
+}
+
+func (c *cancelCtx) Value(key any) any {
+	if key == &cancelCtxKey { // 如果查询是自己
+		return c
+	}
+	return value(c.Context, key) // 否则往上查找
+}
+
 func WithCancel(parent context.Context) (ctx context.Context, cancel context.CancelFunc) {
 	c := withCancel(parent)
 	return c, func() {
