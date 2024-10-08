@@ -9,6 +9,10 @@ import (
 // Timeout 当前时间加上一段时间,最终会计算到未来的某个时间点
 // Deadline 直接指明未来的某个时间点
 
+type timerCtx struct {
+	cancelCtx
+}
+
 func WithTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
 	return context.WithDeadline(parent, time.Now().Add(timeout))
 }
