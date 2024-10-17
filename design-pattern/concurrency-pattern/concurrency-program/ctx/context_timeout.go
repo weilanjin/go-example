@@ -11,6 +11,22 @@ import (
 
 type timerCtx struct {
 	cancelCtx
+	timer    *time.Timer
+	deadline time.Time
+}
+
+func (c *timerCtx) cancel(removeFromParent bool, err, cause error) {
+	c.cancelCtx.cancel(false, err, cause)
+	if removeFromParent {
+		// 从父 Context 的子Context列表中移除自己
+		removeChild(c.cancelCtx.Context, c)
+	}
+	c.mu.Lock()
+	if c.timer != nil { // 即使关闭定时器, 否则有内存泄露的风险
+		c.timer.Stop()
+		c.timer = nil
+	}
+	c.mu.Unlock()
 }
 
 func WithTimeout(parent context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
@@ -21,9 +37,6 @@ func WithTimeout(parent context.Context, timeout time.Duration) (context.Context
 // 1.当达到截止时间时
 // 2.当返回的cancel函数被调用时
 // 3.当父Context的Done channel被关闭时 (超时时间超过父节点的截止时间, 父节点时间到了就会直接取消)
-func WithDeadline(parent context.Context, d time.Time) (context.Context, context.CancelFunc) {
-	return nil, nil
-}
 
 func Usecase() {
 	// case1: 超时
