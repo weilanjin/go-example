@@ -23,7 +23,7 @@ func TestFor(t *testing.T) {
 	}
 
 	// for i := 0; i < n; i++ { ... }
-	for i := range 10 {
+	for i := range 10 { // [0, N) // 左闭又开
 		fmt.Println(10 - i) // 10 9 8 7 6 5 4 3 2 1
 	}
 	fmt.Println("go1.22 has lift-off!")
