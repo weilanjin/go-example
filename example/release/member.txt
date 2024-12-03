@@ -1,0 +1,9 @@
+Go语言起源于2007年的Google
+三位创始人
+    Ken Thompson
+    Rob Pike
+    Robert Griesemer
+
+核心开发
+    lan Lance Tyalor
+    Russ Cox
