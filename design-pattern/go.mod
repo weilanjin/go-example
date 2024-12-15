@@ -8,6 +8,7 @@ require (
 	github.com/marusama/cyclicbarrier v1.1.0
 	github.com/redis/go-redis/v9 v9.0.2
 	github.com/sasha-s/go-deadlock v0.3.5
+	github.com/sony/gobreaker/v2 v2.0.0
 	go.etcd.io/etcd/client/v3 v3.5.17
 	go.uber.org/ratelimit v0.3.1
 	golang.org/x/sync v0.10.0
