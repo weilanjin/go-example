@@ -59,11 +59,6 @@ func (client *Client) Go(serviceMethod string, args any, reply any, done chan *C
 	return call
 }
 
-func (client *Client) Call(serviceMethod string, args any, reply any) error {
-	call := <-client.Go(serviceMethod, args, reply, make(chan *Call, 1)).Done
-	return call.Error
-}
-
 func (client *Client) send(call *Call) {
 	// client.sending.Lock()
 }
