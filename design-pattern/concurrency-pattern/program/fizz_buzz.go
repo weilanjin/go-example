@@ -1,4 +1,4 @@
-package concurrencyprogram
+package program
 
 import (
 	"fmt"
