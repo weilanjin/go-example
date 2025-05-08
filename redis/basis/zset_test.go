@@ -4,6 +4,8 @@ import (
 	"log"
 	"strconv"
 	"testing"
+
+	"github.com/redis/go-redis/v9"
 )
 
 /*

@@ -1,10 +1,11 @@
 package main
 
 import (
-	"go.uber.org/zap"
-	"go.uber.org/zap/exp/zapslog"
 	"log/slog"
 	"testing"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/exp/zapslog"
 )
 
 func TestSlogZap(t *testing.T) {

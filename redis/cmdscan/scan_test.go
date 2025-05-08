@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"testing"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/weilanjin/go-example/redis/initialize"
 )
 

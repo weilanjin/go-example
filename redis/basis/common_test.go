@@ -2,9 +2,11 @@ package basis
 
 import (
 	"context"
-	"github.com/weilanjin/go-example/redis/initialize"
 	"log"
 	"testing"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/weilanjin/go-example/redis/initialize"
 )
 
 var (

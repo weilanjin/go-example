@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"context"
 	"io"
-	"lovec.wlj/web-framework/engine/pkg/atomic"
-	"lovec.wlj/web-framework/engine/pkg/logger"
-	"lovec.wlj/web-framework/engine/pkg/wait"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/weilanjin/go-example/web-framework/engine/pkg/atomic"
+	"github.com/weilanjin/go-example/web-framework/engine/pkg/logger"
+	"github.com/weilanjin/go-example/web-framework/engine/pkg/wait"
 )
 
 type EchoHandler struct {

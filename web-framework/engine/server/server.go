@@ -3,13 +3,14 @@ package server
 import (
 	"context"
 	"fmt"
-	"lovec.wlj/web-framework/engine/iface/tcp"
-	"lovec.wlj/web-framework/engine/pkg/logger"
 	"net"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/weilanjin/go-example/web-framework/engine/iface/tcp"
+	"github.com/weilanjin/go-example/web-framework/engine/pkg/logger"
 )
 
 type Config struct {

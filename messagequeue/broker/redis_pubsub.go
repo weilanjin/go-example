@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"runtime/debug"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type redisPubSub struct {

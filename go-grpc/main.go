@@ -1,12 +1,12 @@
 package main
 
 import (
+	v1 "github.com/weilanjin/go-example/go-grpc/idl/ecommerce/v1"
 	"log"
 	"net"
 
+	"github.com/weilanjin/go-example/go-grpc/internal/domain/ecommerce/service"
 	"google.golang.org/grpc"
-	v1 "lovec.wlj/go-grpc/idl/ecommerce/v1"
-	"lovec.wlj/go-grpc/internal/domain/ecommerce/service"
 )
 
 const addrs = ":50051"

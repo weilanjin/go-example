@@ -2,13 +2,15 @@ package gslog
 
 import (
 	"context"
-	slogcontext "github.com/PumpkinSeed/slog-context"
-	slogmulti "github.com/samber/slog-multi"
-	slogsampling "github.com/samber/slog-sampling"
 	"log/slog"
 	"os"
 	"testing"
 	"time"
+
+	slogcontext "github.com/PumpkinSeed/slog-context"
+	"github.com/phsym/console-slog"
+	slogmulti "github.com/samber/slog-multi"
+	slogsampling "github.com/samber/slog-sampling"
 )
 
 func TestMultiHandler(t *testing.T) {

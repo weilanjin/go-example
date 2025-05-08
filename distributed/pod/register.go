@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 var ErrRegister = errors.New("register fail")

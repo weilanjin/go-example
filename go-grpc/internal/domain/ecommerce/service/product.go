@@ -2,12 +2,12 @@ package service
 
 import (
 	"context"
+	v1 "github.com/weilanjin/go-example/go-grpc/idl/ecommerce/v1"
+	"github.com/weilanjin/go-example/pkg/uid"
 	"sync"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	v1 "lovec.wlj/go-grpc/idl/ecommerce/v1"
-	"lovec.wlj/pkg/uid"
 )
 
 var storage = sync.Map{}

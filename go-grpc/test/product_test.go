@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	v1 "github.com/weilanjin/go-example/go-grpc/idl/ecommerce/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	v1 "lovec.wlj/go-grpc/idl/ecommerce/v1"
 )
 
 const addrs = "localhost:50051"

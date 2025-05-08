@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"lovec.wlj/pkg/mem"
+	"github.com/weilanjin/go-example/pkg/mem"
 )
 
 func TestMemConsumed(t *testing.T) {

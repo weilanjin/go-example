@@ -3,12 +3,14 @@ package debug_test
 import (
 	"context"
 	"errors"
-	"github.com/weilanjin/go-example/debug"
-	"github.com/weilanjin/go-example/debug/trace"
-	broker2 "github.com/weilanjin/go-example/messagequeue/broker"
 	"log"
 	"sync/atomic"
 	"testing"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/weilanjin/go-example/debug"
+	"github.com/weilanjin/go-example/debug/trace"
+	broker2 "github.com/weilanjin/go-example/messagequeue/broker"
 )
 
 const spanUserRegister = "user_register"

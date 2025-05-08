@@ -2,10 +2,13 @@
 package redsync
 
 import (
-	"github.com/weilanjin/go-example/redis/initialize"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/go-redsync/redsync/v4"
+	"github.com/go-redsync/redsync/v4/redis/goredis"
+	"github.com/weilanjin/go-example/redis/initialize"
 )
 
 func TestDistributedLock(t *testing.T) {

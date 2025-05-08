@@ -1,13 +1,15 @@
 package gslog
 
 import (
-	"github.com/weilanjin/go-example/log/slog/deep"
 	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/natefinch/lumberjack"
+	"github.com/weilanjin/go-example/log/slog/deep"
 )
 
 // 写入日志文件并输出到控制台

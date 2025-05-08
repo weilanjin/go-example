@@ -4,7 +4,9 @@ import (
 	"context"
 	"time"
 
-	"lovec.wlj/pkg/uid"
+	"github.com/weilanjin/go-example/pkg/uid"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type Master struct {

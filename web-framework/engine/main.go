@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"lovec.wlj/web-framework/engine/config"
-	"lovec.wlj/web-framework/engine/pkg/file"
-	"lovec.wlj/web-framework/engine/pkg/logger"
-	"lovec.wlj/web-framework/engine/server"
+
+	"github.com/weilanjin/go-example/web-framework/engine/config"
+	"github.com/weilanjin/go-example/web-framework/engine/pkg/file"
+	"github.com/weilanjin/go-example/web-framework/engine/pkg/logger"
+	"github.com/weilanjin/go-example/web-framework/engine/server"
 )
 
 const configFile = "config.conf"

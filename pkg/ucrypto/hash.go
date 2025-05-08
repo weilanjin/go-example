@@ -1,8 +1,8 @@
 package ucrypto
 
 import (
+	"github.com/weilanjin/go-example/pkg/uid"
 	"golang.org/x/crypto/bcrypt"
-	"lovec.wlj/pkg/uid"
 )
 
 var bcryptSalt = uid.RandSeqID(8)

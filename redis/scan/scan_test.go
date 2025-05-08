@@ -3,9 +3,11 @@ package scan
 import (
 	"context"
 	"encoding/json"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/weilanjin/go-example/redis/initialize"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/redis/go-redis/v9"
+	"github.com/weilanjin/go-example/redis/initialize"
 )
 
 var rdb redis.UniversalClient

@@ -1,12 +1,11 @@
 package limit_test
 
 import (
+	"github.com/weilanjin/go-example/web-framework/limit"
 	"log"
 	"sync"
 	"testing"
 	"time"
-
-	"lovec.wlj/web-framework/limit"
 )
 
 func TestCunt(t *testing.T) {

@@ -2,8 +2,9 @@ package ucrypto_test
 
 import (
 	"encoding/base64"
-	"lovec.wlj/pkg/ucrypto"
 	"testing"
+
+	"github.com/weilanjin/go-example/pkg/ucrypto"
 )
 
 func TestBase64(t *testing.T) {

@@ -3,7 +3,7 @@ package err
 import (
 	"bytes"
 	"fmt"
-	"lovec.wlj/go-sourcecode/log"
+	"github.com/weilanjin/go-example/log/log"
 	"runtime/debug"
 )
 

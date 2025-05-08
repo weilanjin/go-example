@@ -1,8 +1,9 @@
 package logger_test
 
 import (
-	"lovec.wlj/web-framework/engine/pkg/logger"
 	"testing"
+
+	"github.com/weilanjin/go-example/web-framework/engine/pkg/logger"
 )
 
 func TestLogger(t *testing.T) {
