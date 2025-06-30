@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html> 
+    <body>
+        Mem: <span id="memory"></span><br>
+        CPU: <span id="cpu"></span><br>
+    </body>
+    <script type="text/javascript">
+        const eventSrc = new EventSource('http://127.0.0.1:8080/events');
+        const mem = document.getElementById("memory");
+        const cpu = document.getElementById("cpu");
+        eventSrc.addEventListener("mem", (event) => {
+            mem.textContent = event.data;
+        })
+        eventSrc.addEventListener("cpu", (event) => {
+            cpu.textContent = event.data;
+        })
+        eventSrc.onerror = (event) => {
+            console.error("EventSource failed:", event);
+        };
+    </script>
+</html>
