@@ -3,11 +3,12 @@ package gslog_test
 import (
 	"context"
 	"fmt"
-	gslog "github.com/weilanjin/go-example/log/slog"
 	"log/slog"
 	"net"
 	"testing"
 	"time"
+
+	gslog "github.com/weilanjin/go-example/log/slog"
 )
 
 func TestCustomHandler(t *testing.T) {
@@ -24,7 +25,7 @@ func TestCustomHandler(t *testing.T) {
 		}
 	}()
 	slog.Info("hello", "name", "Al")
-	slog.Error("oops", net.ErrClosed, "status", 500)
+	slog.Error("oops", "err", net.ErrClosed, "status", 500)
 	slog.LogAttrs(context.Background(), slog.LevelError, "oops",
 		slog.Int("status", 500), slog.Any("err", net.ErrClosed),
 	)

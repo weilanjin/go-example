@@ -10,6 +10,8 @@ import (
 	"github.com/shirou/gopsutil/v4/mem"
 )
 
+// https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events
+
 func main() {
 	http.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
