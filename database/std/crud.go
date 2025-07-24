@@ -6,6 +6,12 @@ import (
 	"strings"
 )
 
+type Column struct {
+	Name  string // 字段名
+	Value any    // 字段值
+	Ptr   any    // 字段值的指针
+}
+
 // ------------ model -------------------
 type User struct {
 	ID           int
@@ -19,12 +25,36 @@ func (*User) TableName() string {
 	return "users"
 }
 
+func (m *User) ColumnID() Column {
+	return Column{
+		Name:  "id",
+		Value: m.ID,
+		Ptr:   &m.ID,
+	}
+}
+func (m *User) ColunmName() Column {
+	return Column{
+		Name:  "name",
+		Value: m.Name,
+		Ptr:   &m.Name,
+	}
+}
+func Email() string {
+	return "email"
+}
+func PhoneNo() string {
+	return "phoneNo"
+}
+func RegisterTime() string {
+	return "registerTime"
+}
+
 func (m *User) Mapping() map[string]func(*User) any {
 	return map[string]func(*User) any{
-		"mame":         func(u *User) any { return u.Name },
-		"email":        func(u *User) any { return u.Email },
-		"phoneNo":      func(u *User) any { return u.PhoneNo },
-		"registerTime": func(u *User) any { return u.RegisterTime },
+		m.ColunmName().Name: func(u *User) any { return m.ColumnID() },
+		"email":             func(u *User) any { return u.Email },
+		"phoneNo":           func(u *User) any { return u.PhoneNo },
+		"registerTime":      func(u *User) any { return u.RegisterTime },
 	}
 }
 
