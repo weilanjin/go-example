@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件上传</title>
+</head>
+<body>
+    <input type="file" id="fileInput">
+     <button id="uploadButton">上传文件</button>
+     <div id="result"></div>
+ 
+     <script>
+         document.getElementById('uploadButton').addEventListener('click', function() {
+             const fileInput = document.getElementById('fileInput');
+             const file = fileInput.files[0];
+ 
+             if (!file) {
+                 document.getElementById('result').textContent = '请选择文件';
+                 return;
+             }
+ 
+             const formData = new FormData();
+             formData.append('file', file);
+ 
+             fetch('http://localhost:8080/upload', {
+                 method: 'POST',
+                 body: formData
+             })
+             .then(response => response.text())
+             .then(data => {
+                 document.getElementById('result').textContent = data;
+             })
+             .catch(error => {
+                 document.getElementById('result').textContent = `上传失败: ${error.message}`;
+             });
+         });
+     </script>
+ </body>
+ </html>
