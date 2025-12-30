@@ -10,7 +10,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/weilanjin/go-example/debug"
 	"github.com/weilanjin/go-example/debug/trace"
-	broker2 "github.com/weilanjin/go-example/messagequeue/broker"
+	broker2 "github.com/weilanjin/go-example/microservice/messagequeue/broker"
 )
 
 const spanUserRegister = "user_register"

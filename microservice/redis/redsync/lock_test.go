@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/go-redsync/redsync/v4"
-	"github.com/go-redsync/redsync/v4/redis/goredis"
-	"github.com/weilanjin/go-example/redis/initialize"
+	"github.com/go-redsync/redsync/v4/redis/redigo"
+	"github.com/weilanjin/go-example/microservice/redis/initialize"
 )
 
 func TestDistributedLock(t *testing.T) {
@@ -17,7 +17,7 @@ func TestDistributedLock(t *testing.T) {
 	// use while communicating with Redis. This can also be any pool that
 	// implements the `redis.Pool` interface.
 	rdb := initialize.Redis()
-	pool := goredis.NewPool(rdb) // or, pool := redigo.NewPool(...)
+	pool := redigo.NewPool(rdb) // or, pool := redigo.NewPool(...)
 
 	// Create an instance of redisync to be used to obtain a mutual exclusion
 	// lock.
