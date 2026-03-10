@@ -11,3 +11,4 @@ package go125
 	7. 新实验性 encoding/json/v2 包
 	8. WaitGroup.Go 方法
 */
+// https://go.dev/doc/go1.25
