@@ -1003,6 +1003,71 @@ func TestGoPlusCtxChannelControls(t *testing.T) {
 	}
 }
 
+func TestBizCommonOperators(t *testing.T) {
+	type row struct {
+		k string
+		v int
+	}
+	rows := From(row{"a", 1}, row{"a", 2}, row{"b", 3})
+	pairs := MapFn(KeyByFn(rows, func(r row) string { return r.k }), func(p Pair[string, row]) Pair[string, int] {
+		return Pair[string, int]{Key: p.Key, Value: p.Value.v}
+	})
+
+	sum := SumByKey(pairs).Slice()
+	if len(sum) != 2 {
+		t.Fatalf("sumByKey size mismatch: %v", sum)
+	}
+
+	count := CountByKeyStream(pairs).Slice()
+	if len(count) != 2 {
+		t.Fatalf("countByKeyStream size mismatch: %v", count)
+	}
+
+	left := From(
+		Pair[string, int]{Key: "a", Value: 1},
+		Pair[string, int]{Key: "b", Value: 2},
+	)
+	right := From(
+		Pair[string, string]{Key: "a", Value: "x"},
+	)
+	if got := InnerJoinByKey(left, right).Slice(); len(got) != 1 || got[0].Key != "a" {
+		t.Fatalf("innerJoinByKey mismatch: %v", got)
+	}
+	if got := LeftJoinByKey(left, right).Slice(); len(got) != 2 {
+		t.Fatalf("leftJoinByKey mismatch: %v", got)
+	}
+
+	tw := TumblingWindow(From(1, 2, 3, 4, 5), 2).Slice()
+	if len(tw) != 3 || !reflect.DeepEqual(tw[0], []int{1, 2}) {
+		t.Fatalf("tumblingWindow mismatch: %v", tw)
+	}
+
+	sw := SlidingWindow(From(1, 2, 3, 4), 3, 1).Slice()
+	if len(sw) != 2 || !reflect.DeepEqual(sw[1], []int{2, 3, 4}) {
+		t.Fatalf("slidingWindow mismatch: %v", sw)
+	}
+
+	wr := WindowReduce(From(1, 2, 3, 4), 2, 0, func(acc, v int) int { return acc + v }).Slice()
+	if !reflect.DeepEqual(wr, []int{3, 7}) {
+		t.Fatalf("windowReduce mismatch: %v", wr)
+	}
+
+	pr := Process(From(1, 2, 3, 4), func(v int) (int, bool) {
+		if v%2 == 0 {
+			return v * 10, true
+		}
+		return 0, false
+	}).Slice()
+	if !reflect.DeepEqual(pr, []int{20, 40}) {
+		t.Fatalf("process mismatch: %v", pr)
+	}
+
+	pm := ProcessMany(From(1, 2), func(v int) []int { return []int{v, -v} }).Slice()
+	if !reflect.DeepEqual(pm, []int{1, -1, 2, -2}) {
+		t.Fatalf("processMany mismatch: %v", pm)
+	}
+}
+
 func TestGoStyleDirectNames(t *testing.T) {
 	v := 7
 	if got := FromPointer(&v).Slice(); !reflect.DeepEqual(got, []int{7}) {
