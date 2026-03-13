@@ -2,14 +2,16 @@ package main
 
 import "strings"
 
-// Collector models Java Collectors contract in Go generic style. | Collector 用 Go 泛型表达 Java Collectors 契约。
+// Collector models Java Collectors contract in Go generic style.
+// Collector 用 Go 泛型表达 Java Collectors 契约。
 type Collector[T any, A any, R any] struct {
 	Supplier    func() A
 	Accumulator func(*A, T)
 	Finisher    func(A) R
 }
 
-// CollectWith collects stream by collector contract. | CollectWith 使用 collector 契约收集流。
+// CollectWith collects stream by collector contract.
+// CollectWith 使用 collector 契约收集流。
 func CollectWith[T any, A any, R any](s Stream[T], c Collector[T, A, R]) R {
 	if c.Supplier == nil {
 		var zero R
@@ -29,7 +31,8 @@ func CollectWith[T any, A any, R any](s Stream[T], c Collector[T, A, R]) R {
 	return zero
 }
 
-// ToSliceCollector returns collector that gathers elements into slice. | ToSliceCollector 返回收集为切片的 collector。
+// ToSliceCollector returns collector that gathers elements into slice.
+// ToSliceCollector 返回收集为切片的 collector。
 func ToSliceCollector[T any]() Collector[T, []T, []T] {
 	return Collector[T, []T, []T]{
 		Supplier: func() []T { return make([]T, 0) },
@@ -40,7 +43,8 @@ func ToSliceCollector[T any]() Collector[T, []T, []T] {
 	}
 }
 
-// ToSetCollector returns collector that gathers elements into set map. | ToSetCollector 返回收集为集合 map 的 collector。
+// ToSetCollector returns collector that gathers elements into set map.
+// ToSetCollector 返回收集为集合 map 的 collector。
 func ToSetCollector[T comparable]() Collector[T, map[T]struct{}, map[T]struct{}] {
 	return Collector[T, map[T]struct{}, map[T]struct{}]{
 		Supplier: func() map[T]struct{} { return map[T]struct{}{} },
@@ -51,7 +55,8 @@ func ToSetCollector[T comparable]() Collector[T, map[T]struct{}, map[T]struct{}]
 	}
 }
 
-// CountingCollector returns collector that counts elements. | CountingCollector 返回计数 collector。
+// CountingCollector returns collector that counts elements.
+// CountingCollector 返回计数 collector。
 func CountingCollector[T any]() Collector[T, int64, int64] {
 	return Collector[T, int64, int64]{
 		Supplier: func() int64 { return 0 },
@@ -62,7 +67,8 @@ func CountingCollector[T any]() Collector[T, int64, int64] {
 	}
 }
 
-// JoiningCollector joins string elements. | JoiningCollector 拼接字符串元素。
+// JoiningCollector joins string elements.
+// JoiningCollector 拼接字符串元素。
 func JoiningCollector(delimiter, prefix, suffix string) Collector[string, []string, string] {
 	return Collector[string, []string, string]{
 		Supplier: func() []string { return make([]string, 0) },
@@ -75,7 +81,8 @@ func JoiningCollector(delimiter, prefix, suffix string) Collector[string, []stri
 	}
 }
 
-// MappingCollector adapts input element type for downstream collector. | MappingCollector 为下游 collector 适配输入类型。
+// MappingCollector adapts input element type for downstream collector.
+// MappingCollector 为下游 collector 适配输入类型。
 func MappingCollector[T any, U any, A any, R any](mapper func(T) U, downstream Collector[U, A, R]) Collector[T, A, R] {
 	if mapper == nil || downstream.Supplier == nil {
 		return Collector[T, A, R]{}
@@ -92,7 +99,8 @@ func MappingCollector[T any, U any, A any, R any](mapper func(T) U, downstream C
 	}
 }
 
-// FilteringCollector forwards only matched elements to downstream collector. | FilteringCollector 仅将满足条件的元素发送到下游 collector。
+// FilteringCollector forwards only matched elements to downstream collector.
+// FilteringCollector 仅将满足条件的元素发送到下游 collector。
 func FilteringCollector[T any, A any, R any](predicate func(T) bool, downstream Collector[T, A, R]) Collector[T, A, R] {
 	if predicate == nil || downstream.Supplier == nil {
 		return Collector[T, A, R]{}
@@ -109,7 +117,8 @@ func FilteringCollector[T any, A any, R any](predicate func(T) bool, downstream 
 	}
 }
 
-// FlatMappingCollector expands each input into many downstream values. | FlatMappingCollector 将输入展开为多个下游值。
+// FlatMappingCollector expands each input into many downstream values.
+// FlatMappingCollector 将输入展开为多个下游值。
 func FlatMappingCollector[T any, U any, A any, R any](mapper func(T) []U, downstream Collector[U, A, R]) Collector[T, A, R] {
 	if mapper == nil || downstream.Supplier == nil {
 		return Collector[T, A, R]{}
@@ -129,7 +138,8 @@ func FlatMappingCollector[T any, U any, A any, R any](mapper func(T) []U, downst
 	}
 }
 
-// GroupingByCollector groups values by key into map[K][]T. | GroupingByCollector 按 key 分组为 map[K][]T。
+// GroupingByCollector groups values by key into map[K][]T.
+// GroupingByCollector 按 key 分组为 map[K][]T。
 func GroupingByCollector[T any, K comparable](classifier func(T) K) Collector[T, map[K][]T, map[K][]T] {
 	if classifier == nil {
 		return Collector[T, map[K][]T, map[K][]T]{}
@@ -144,7 +154,8 @@ func GroupingByCollector[T any, K comparable](classifier func(T) K) Collector[T,
 	}
 }
 
-// GroupingByMappingCollector groups by key and maps each value before appending. | GroupingByMappingCollector 按 key 分组并映射每个值。
+// GroupingByMappingCollector groups by key and maps each value before appending.
+// GroupingByMappingCollector 按 key 分组并映射每个值。
 func GroupingByMappingCollector[T any, K comparable, V any](classifier func(T) K, mapper func(T) V) Collector[T, map[K][]V, map[K][]V] {
 	if classifier == nil || mapper == nil {
 		return Collector[T, map[K][]V, map[K][]V]{}
@@ -159,7 +170,8 @@ func GroupingByMappingCollector[T any, K comparable, V any](classifier func(T) K
 	}
 }
 
-// PartitioningByCollector partitions values into true/false buckets. | PartitioningByCollector 将值划分为 true/false 两个桶。
+// PartitioningByCollector partitions values into true/false buckets.
+// PartitioningByCollector 将值划分为 true/false 两个桶。
 func PartitioningByCollector[T any](predicate func(T) bool) Collector[T, map[bool][]T, map[bool][]T] {
 	if predicate == nil {
 		return Collector[T, map[bool][]T, map[bool][]T]{}
@@ -176,7 +188,8 @@ func PartitioningByCollector[T any](predicate func(T) bool) Collector[T, map[boo
 	}
 }
 
-// ToMapCollector collects values into map with merge strategy on duplicate keys. | ToMapCollector 收集到 map，并支持重复 key 合并策略。
+// ToMapCollector collects values into map with merge strategy on duplicate keys.
+// ToMapCollector 收集到 map，并支持重复 key 合并策略。
 func ToMapCollector[T any, K comparable, V any](keyMapper func(T) K, valueMapper func(T) V, mergeFn func(existing, incoming V) V) Collector[T, map[K]V, map[K]V] {
 	if keyMapper == nil || valueMapper == nil {
 		return Collector[T, map[K]V, map[K]V]{}
@@ -196,7 +209,8 @@ func ToMapCollector[T any, K comparable, V any](keyMapper func(T) K, valueMapper
 	}
 }
 
-// MinByCollector collects minimal element by comparator. | MinByCollector 按比较器收集最小元素。
+// MinByCollector collects minimal element by comparator.
+// MinByCollector 按比较器收集最小元素。
 func MinByCollector[T any](less func(a, b T) bool) Collector[T, Optional[T], Optional[T]] {
 	if less == nil {
 		return Collector[T, Optional[T], Optional[T]]{}
@@ -213,7 +227,8 @@ func MinByCollector[T any](less func(a, b T) bool) Collector[T, Optional[T], Opt
 	}
 }
 
-// MaxByCollector collects maximal element by comparator. | MaxByCollector 按比较器收集最大元素。
+// MaxByCollector collects maximal element by comparator.
+// MaxByCollector 按比较器收集最大元素。
 func MaxByCollector[T any](less func(a, b T) bool) Collector[T, Optional[T], Optional[T]] {
 	if less == nil {
 		return Collector[T, Optional[T], Optional[T]]{}
@@ -230,7 +245,8 @@ func MaxByCollector[T any](less func(a, b T) bool) Collector[T, Optional[T], Opt
 	}
 }
 
-// GroupingByDownstreamCollector groups by key and applies downstream collector per bucket. | GroupingByDownstreamCollector 按 key 分组并对每组应用下游 collector。
+// GroupingByDownstreamCollector groups by key and applies downstream collector per bucket.
+// GroupingByDownstreamCollector 按 key 分组并对每组应用下游 collector。
 func GroupingByDownstreamCollector[T any, K comparable, A any, R any](classifier func(T) K, downstream Collector[T, A, R]) Collector[T, map[K]A, map[K]R] {
 	if classifier == nil || downstream.Supplier == nil {
 		return Collector[T, map[K]A, map[K]R]{}
@@ -268,7 +284,8 @@ type teeAccumulator[A1 any, A2 any] struct {
 	right A2
 }
 
-// TeeingCollector routes stream to two collectors and merges final results. | TeeingCollector 将流送入两个 collector 并合并最终结果。
+// TeeingCollector routes stream to two collectors and merges final results.
+// TeeingCollector 将流送入两个 collector 并合并最终结果。
 func TeeingCollector[T any, A1 any, R1 any, A2 any, R2 any, R any](
 	left Collector[T, A1, R1],
 	right Collector[T, A2, R2],
@@ -306,7 +323,8 @@ func TeeingCollector[T any, A1 any, R1 any, A2 any, R2 any, R any](
 	}
 }
 
-// CollectingAndThen wraps downstream finisher with final transform. | CollectingAndThen 使用最终转换包装下游 finisher。
+// CollectingAndThen wraps downstream finisher with final transform.
+// CollectingAndThen 使用最终转换包装下游 finisher。
 func CollectingAndThen[T any, A any, R any, RR any](downstream Collector[T, A, R], finisher func(R) RR) Collector[T, A, RR] {
 	if downstream.Supplier == nil || finisher == nil {
 		return Collector[T, A, RR]{}
@@ -324,7 +342,8 @@ func CollectingAndThen[T any, A any, R any, RR any](downstream Collector[T, A, R
 	}
 }
 
-// ReducingCollector reduces mapped values by operator with identity. | ReducingCollector 使用 identity 与操作符进行归约。
+// ReducingCollector reduces mapped values by operator with identity.
+// ReducingCollector 使用 identity 与操作符进行归约。
 func ReducingCollector[T any, U any](identity U, mapper func(T) U, op func(U, U) U) Collector[T, U, U] {
 	if mapper == nil || op == nil {
 		return Collector[T, U, U]{}
@@ -338,7 +357,8 @@ func ReducingCollector[T any, U any](identity U, mapper func(T) U, op func(U, U)
 	}
 }
 
-// SummingIntCollector sums int-mapped values into int64. | SummingIntCollector 对 int 映射值求和，结果为 int64。
+// SummingIntCollector sums int-mapped values into int64.
+// SummingIntCollector 对 int 映射值求和，结果为 int64。
 func SummingIntCollector[T any](mapper func(T) int) Collector[T, int64, int64] {
 	if mapper == nil {
 		return Collector[T, int64, int64]{}
@@ -352,7 +372,8 @@ func SummingIntCollector[T any](mapper func(T) int) Collector[T, int64, int64] {
 	}
 }
 
-// SummingInt64Collector sums int64-mapped values. | SummingInt64Collector 对 int64 映射值求和。
+// SummingInt64Collector sums int64-mapped values.
+// SummingInt64Collector 对 int64 映射值求和。
 func SummingInt64Collector[T any](mapper func(T) int64) Collector[T, int64, int64] {
 	if mapper == nil {
 		return Collector[T, int64, int64]{}
@@ -366,7 +387,8 @@ func SummingInt64Collector[T any](mapper func(T) int64) Collector[T, int64, int6
 	}
 }
 
-// SummingFloat64Collector sums float64-mapped values. | SummingFloat64Collector 对 float64 映射值求和。
+// SummingFloat64Collector sums float64-mapped values.
+// SummingFloat64Collector 对 float64 映射值求和。
 func SummingFloat64Collector[T any](mapper func(T) float64) Collector[T, float64, float64] {
 	if mapper == nil {
 		return Collector[T, float64, float64]{}
@@ -385,7 +407,8 @@ type averagingState struct {
 	count int64
 }
 
-// AveragingIntCollector computes average of int-mapped values. | AveragingIntCollector 计算 int 映射值的平均值。
+// AveragingIntCollector computes average of int-mapped values.
+// AveragingIntCollector 计算 int 映射值的平均值。
 func AveragingIntCollector[T any](mapper func(T) int) Collector[T, averagingState, float64] {
 	if mapper == nil {
 		return Collector[T, averagingState, float64]{}
@@ -405,7 +428,8 @@ func AveragingIntCollector[T any](mapper func(T) int) Collector[T, averagingStat
 	}
 }
 
-// AveragingInt64Collector computes average of int64-mapped values. | AveragingInt64Collector 计算 int64 映射值的平均值。
+// AveragingInt64Collector computes average of int64-mapped values.
+// AveragingInt64Collector 计算 int64 映射值的平均值。
 func AveragingInt64Collector[T any](mapper func(T) int64) Collector[T, averagingState, float64] {
 	if mapper == nil {
 		return Collector[T, averagingState, float64]{}
@@ -425,7 +449,8 @@ func AveragingInt64Collector[T any](mapper func(T) int64) Collector[T, averaging
 	}
 }
 
-// AveragingFloat64Collector computes average of float64-mapped values. | AveragingFloat64Collector 计算 float64 映射值的平均值。
+// AveragingFloat64Collector computes average of float64-mapped values.
+// AveragingFloat64Collector 计算 float64 映射值的平均值。
 func AveragingFloat64Collector[T any](mapper func(T) float64) Collector[T, averagingState, float64] {
 	if mapper == nil {
 		return Collector[T, averagingState, float64]{}
@@ -445,7 +470,8 @@ func AveragingFloat64Collector[T any](mapper func(T) float64) Collector[T, avera
 	}
 }
 
-// IntSummaryStatistics is summary for int mapped values. | IntSummaryStatistics 是 int 映射值的统计结果。
+// IntSummaryStatistics is summary for int mapped values.
+// IntSummaryStatistics 是 int 映射值的统计结果。
 type IntSummaryStatistics struct {
 	Count int64
 	Sum   int64
@@ -454,7 +480,8 @@ type IntSummaryStatistics struct {
 	init  bool
 }
 
-// Average returns average value. | Average 返回平均值。
+// Average returns average value.
+// Average 返回平均值。
 func (s IntSummaryStatistics) Average() float64 {
 	if s.Count == 0 {
 		return 0
@@ -462,7 +489,8 @@ func (s IntSummaryStatistics) Average() float64 {
 	return float64(s.Sum) / float64(s.Count)
 }
 
-// LongSummaryStatistics is summary for int64 mapped values. | LongSummaryStatistics 是 int64 映射值的统计结果。
+// LongSummaryStatistics is summary for int64 mapped values.
+// LongSummaryStatistics 是 int64 映射值的统计结果。
 type LongSummaryStatistics struct {
 	Count int64
 	Sum   int64
@@ -471,7 +499,8 @@ type LongSummaryStatistics struct {
 	init  bool
 }
 
-// Average returns average value. | Average 返回平均值。
+// Average returns average value.
+// Average 返回平均值。
 func (s LongSummaryStatistics) Average() float64 {
 	if s.Count == 0 {
 		return 0
@@ -479,7 +508,8 @@ func (s LongSummaryStatistics) Average() float64 {
 	return float64(s.Sum) / float64(s.Count)
 }
 
-// DoubleSummaryStatistics is summary for float64 mapped values. | DoubleSummaryStatistics 是 float64 映射值的统计结果。
+// DoubleSummaryStatistics is summary for float64 mapped values.
+// DoubleSummaryStatistics 是 float64 映射值的统计结果。
 type DoubleSummaryStatistics struct {
 	Count int64
 	Sum   float64
@@ -488,7 +518,8 @@ type DoubleSummaryStatistics struct {
 	init  bool
 }
 
-// Average returns average value. | Average 返回平均值。
+// Average returns average value.
+// Average 返回平均值。
 func (s DoubleSummaryStatistics) Average() float64 {
 	if s.Count == 0 {
 		return 0
@@ -496,7 +527,8 @@ func (s DoubleSummaryStatistics) Average() float64 {
 	return s.Sum / float64(s.Count)
 }
 
-// SummarizingIntCollector summarizes int-mapped values. | SummarizingIntCollector 汇总 int 映射值统计信息。
+// SummarizingIntCollector summarizes int-mapped values.
+// SummarizingIntCollector 汇总 int 映射值统计信息。
 func SummarizingIntCollector[T any](mapper func(T) int) Collector[T, IntSummaryStatistics, IntSummaryStatistics] {
 	if mapper == nil {
 		return Collector[T, IntSummaryStatistics, IntSummaryStatistics]{}
@@ -522,7 +554,8 @@ func SummarizingIntCollector[T any](mapper func(T) int) Collector[T, IntSummaryS
 	}
 }
 
-// SummarizingInt64Collector summarizes int64-mapped values. | SummarizingInt64Collector 汇总 int64 映射值统计信息。
+// SummarizingInt64Collector summarizes int64-mapped values.
+// SummarizingInt64Collector 汇总 int64 映射值统计信息。
 func SummarizingInt64Collector[T any](mapper func(T) int64) Collector[T, LongSummaryStatistics, LongSummaryStatistics] {
 	if mapper == nil {
 		return Collector[T, LongSummaryStatistics, LongSummaryStatistics]{}
@@ -548,7 +581,8 @@ func SummarizingInt64Collector[T any](mapper func(T) int64) Collector[T, LongSum
 	}
 }
 
-// SummarizingFloat64Collector summarizes float64-mapped values. | SummarizingFloat64Collector 汇总 float64 映射值统计信息。
+// SummarizingFloat64Collector summarizes float64-mapped values.
+// SummarizingFloat64Collector 汇总 float64 映射值统计信息。
 func SummarizingFloat64Collector[T any](mapper func(T) float64) Collector[T, DoubleSummaryStatistics, DoubleSummaryStatistics] {
 	if mapper == nil {
 		return Collector[T, DoubleSummaryStatistics, DoubleSummaryStatistics]{}

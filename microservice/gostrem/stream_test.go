@@ -1,21 +1,28 @@
 package main
 
 import (
+	"bytes"
+	"context"
+	"errors"
 	"reflect"
 	"sort"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestStreamChain(t *testing.T) {
 	got := Map(
 		Distinct(
-			Of(1, 2, 2, 3, 4, 5).
+			From(1, 2, 2, 3, 4, 5).
 				Filter(func(v int) bool { return v > 1 }).
 				Skip(1).
 				Limit(3),
 		),
 		func(v int) int { return v * 10 },
-	).CollectToSlice()
+	).Slice()
 
 	want := []int{20, 30, 40}
 	if !reflect.DeepEqual(got, want) {
@@ -24,17 +31,17 @@ func TestStreamChain(t *testing.T) {
 }
 
 func TestMapFlatMap(t *testing.T) {
-	mapped := Map(Of(1, 2, 3), func(v int) string {
+	mapped := Map(From(1, 2, 3), func(v int) string {
 		return string(rune('a' + v - 1))
-	}).CollectToSlice()
+	}).Slice()
 
 	if !reflect.DeepEqual(mapped, []string{"a", "b", "c"}) {
 		t.Fatalf("unexpected mapped result: %v", mapped)
 	}
 
-	flat := FlatMap(Of(1, 2, 3), func(v int) Stream[int] {
-		return Of(v, v*10)
-	}).CollectToSlice()
+	flat := FlatMap(From(1, 2, 3), func(v int) Stream[int] {
+		return From(v, v*10)
+	}).Slice()
 
 	if !reflect.DeepEqual(flat, []int{1, 10, 2, 20, 3, 30}) {
 		t.Fatalf("unexpected flat result: %v", flat)
@@ -42,17 +49,17 @@ func TestMapFlatMap(t *testing.T) {
 }
 
 func TestSortedReduceAndCollectToMap(t *testing.T) {
-	sorted := Of(3, 1, 2).Sorted(func(a, b int) bool { return a < b }).CollectToSlice()
+	sorted := From(3, 1, 2).Sorted(func(a, b int) bool { return a < b }).Slice()
 	if !reflect.DeepEqual(sorted, []int{1, 2, 3}) {
 		t.Fatalf("unexpected sorted result: %v", sorted)
 	}
 
-	sum := Of(1, 2, 3, 4).Reduce(0, func(acc, v int) int { return acc + v })
+	sum := From(1, 2, 3, 4).Reduce(0, func(acc, v int) int { return acc + v })
 	if sum != 10 {
 		t.Fatalf("unexpected reduce result: %d", sum)
 	}
 
-	m := CollectToMap(Of("aa", "bbb", "c"), func(v string) int { return len(v) }, func(v string) string { return v })
+	m := CollectToMap(From("aa", "bbb", "c"), func(v string) int { return len(v) }, func(v string) string { return v })
 	if len(m) != 3 || m[1] != "c" || m[2] != "aa" || m[3] != "bbb" {
 		t.Fatalf("unexpected map result: %v", m)
 	}
@@ -61,7 +68,7 @@ func TestSortedReduceAndCollectToMap(t *testing.T) {
 func TestLazyEvaluation(t *testing.T) {
 	hit := 0
 	s := Map(
-		Of(1, 2, 3).Filter(func(v int) bool {
+		From(1, 2, 3).Filter(func(v int) bool {
 			hit++
 			return v%2 == 1
 		}),
@@ -72,7 +79,7 @@ func TestLazyEvaluation(t *testing.T) {
 		t.Fatalf("lazy broken before terminal, hit=%d", hit)
 	}
 
-	_ = s.CollectToSlice()
+	_ = s.Slice()
 	if hit != 3 {
 		t.Fatalf("unexpected traversal count, hit=%d", hit)
 	}
@@ -80,7 +87,7 @@ func TestLazyEvaluation(t *testing.T) {
 
 func TestShortCircuit(t *testing.T) {
 	countAny := 0
-	any := Of(1, 2, 3, 4, 5).AnyMatch(func(v int) bool {
+	any := From(1, 2, 3, 4, 5).Any(func(v int) bool {
 		countAny++
 		return v == 3
 	})
@@ -92,7 +99,7 @@ func TestShortCircuit(t *testing.T) {
 	}
 
 	countAll := 0
-	all := Of(2, 4, 5, 6).AllMatch(func(v int) bool {
+	all := From(2, 4, 5, 6).Every(func(v int) bool {
 		countAll++
 		return v%2 == 0
 	})
@@ -103,64 +110,64 @@ func TestShortCircuit(t *testing.T) {
 		t.Fatalf("allMatch should short-circuit at first odd, count=%d", countAll)
 	}
 
-	first, ok := Of(9, 8, 7).FindFirst()
+	first, ok := From(9, 8, 7).Head()
 	if !ok || first != 9 {
 		t.Fatalf("findFirst unexpected, first=%d ok=%v", first, ok)
 	}
 }
 
 func TestLimitSkipCount(t *testing.T) {
-	got := Of(1, 2, 3, 4, 5).Skip(2).Limit(2).CollectToSlice()
+	got := From(1, 2, 3, 4, 5).Skip(2).Limit(2).Slice()
 	if !reflect.DeepEqual(got, []int{3, 4}) {
 		t.Fatalf("unexpected skip/limit result: %v", got)
 	}
 
-	if c := Of(1, 2, 3).Count(); c != 3 {
+	if c := From(1, 2, 3).Len(); c != 3 {
 		t.Fatalf("unexpected count result: %d", c)
 	}
 
-	if c := Of(1, 2, 3).Filter(func(v int) bool { return v > 1 }).Count(); c != 2 {
+	if c := From(1, 2, 3).Filter(func(v int) bool { return v > 1 }).Len(); c != 2 {
 		t.Fatalf("unexpected filtered count result: %d", c)
 	}
 
-	if c := Of(1, 2, 3).Limit(0).Count(); c != 0 {
+	if c := From(1, 2, 3).Limit(0).Len(); c != 0 {
 		t.Fatalf("unexpected limit zero count result: %d", c)
 	}
 }
 
 func TestDistinctStability(t *testing.T) {
-	got := Distinct(Of(3, 1, 3, 2, 1, 2)).CollectToSlice()
+	got := Distinct(From(3, 1, 3, 2, 1, 2)).Slice()
 	want := []int{3, 1, 2}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected distinct result, got=%v want=%v", got, want)
 	}
 
-	res := Distinct(Of(5, 4, 4, 3, 2, 2, 1)).Sorted(func(a, b int) bool { return a < b }).CollectToSlice()
+	res := Distinct(From(5, 4, 4, 3, 2, 2, 1)).Sorted(func(a, b int) bool { return a < b }).Slice()
 	if !sort.IntsAreSorted(res) {
 		t.Fatalf("sorted distinct result should be ordered: %v", res)
 	}
 }
 
 func TestFactoriesAndBuilder(t *testing.T) {
-	if c := Empty[int]().Count(); c != 0 {
+	if c := Empty[int]().Len(); c != 0 {
 		t.Fatalf("empty count should be 0, got=%d", c)
 	}
 
-	if c := OfNullable[int](nil).Count(); c != 0 {
+	if c := FromPointer[int](nil).Len(); c != 0 {
 		t.Fatalf("ofNullable nil count should be 0, got=%d", c)
 	}
 
 	v := 42
-	if got := OfNullable(&v).CollectToSlice(); !reflect.DeepEqual(got, []int{42}) {
+	if got := FromPointer(&v).Slice(); !reflect.DeepEqual(got, []int{42}) {
 		t.Fatalf("ofNullable value mismatch: %v", got)
 	}
 
 	b := NewBuilder[int]().Add(1).Add(2).Add(3)
-	if got := b.Build().CollectToSlice(); !reflect.DeepEqual(got, []int{1, 2, 3}) {
+	if got := b.Build().Slice(); !reflect.DeepEqual(got, []int{1, 2, 3}) {
 		t.Fatalf("builder mismatch: %v", got)
 	}
 
-	joined := Concat(Of(1, 2), Of(3, 4)).CollectToSlice()
+	joined := Concat(From(1, 2), From(3, 4)).Slice()
 	if !reflect.DeepEqual(joined, []int{1, 2, 3, 4}) {
 		t.Fatalf("concat mismatch: %v", joined)
 	}
@@ -168,11 +175,11 @@ func TestFactoriesAndBuilder(t *testing.T) {
 
 func TestTakeDropPeekAndNoneMatch(t *testing.T) {
 	peeked := 0
-	res := Of(1, 2, 3, 4, 5).
+	res := From(1, 2, 3, 4, 5).
 		Peek(func(int) { peeked++ }).
 		TakeWhile(func(v int) bool { return v < 4 }).
 		DropWhile(func(v int) bool { return v < 2 }).
-		CollectToSlice()
+		Slice()
 
 	if !reflect.DeepEqual(res, []int{2, 3}) {
 		t.Fatalf("take/drop mismatch: %v", res)
@@ -181,23 +188,23 @@ func TestTakeDropPeekAndNoneMatch(t *testing.T) {
 		t.Fatalf("peek should observe until takeWhile stop, peeked=%d", peeked)
 	}
 
-	if !Of(2, 4, 6).NoneMatch(func(v int) bool { return v%2 == 1 }) {
+	if !From(2, 4, 6).None(func(v int) bool { return v%2 == 1 }) {
 		t.Fatalf("noneMatch should be true")
 	}
 }
 
 func TestGenerateIterateAndSortedByKey(t *testing.T) {
-	gen := Generate(func() int { return 7 }).Limit(3).CollectToSlice()
+	gen := Generate(func() int { return 7 }).Limit(3).Slice()
 	if !reflect.DeepEqual(gen, []int{7, 7, 7}) {
 		t.Fatalf("generate mismatch: %v", gen)
 	}
 
-	it := Iterate(1, func(v int) int { return v + 1 }).Limit(5).CollectToSlice()
+	it := Iterate(1, func(v int) int { return v + 1 }).Limit(5).Slice()
 	if !reflect.DeepEqual(it, []int{1, 2, 3, 4, 5}) {
 		t.Fatalf("iterate mismatch: %v", it)
 	}
 
-	itw := IterateWhile(1, func(v int) bool { return v <= 3 }, func(v int) int { return v + 1 }).CollectToSlice()
+	itw := IterateWhile(1, func(v int) bool { return v <= 3 }, func(v int) int { return v + 1 }).Slice()
 	if !reflect.DeepEqual(itw, []int{1, 2, 3}) {
 		t.Fatalf("iterateWhile mismatch: %v", itw)
 	}
@@ -206,39 +213,39 @@ func TestGenerateIterateAndSortedByKey(t *testing.T) {
 		name string
 		key  int
 	}
-	sorted := SortedByKey(Of(item{"b", 2}, item{"a", 1}), func(v item) int { return v.key }).CollectToSlice()
+	sorted := SortedByKey(From(item{"b", 2}, item{"a", 1}), func(v item) int { return v.key }).Slice()
 	if sorted[0].name != "a" {
 		t.Fatalf("sortedByKey mismatch: %v", sorted)
 	}
 }
 
 func TestOptionalAndMinMax(t *testing.T) {
-	opt := Of(3, 1, 2).ReduceOptional(func(a, b int) int { return a + b })
+	opt := From(3, 1, 2).ReduceOptional(func(a, b int) int { return a + b })
 	if v := opt.OrElse(0); v != 6 {
 		t.Fatalf("reduceOptional mismatch: %d", v)
 	}
 
-	minV := MinOrdered(Of(3, 1, 2)).OrElse(0)
-	maxV := MaxOrdered(Of(3, 1, 2)).OrElse(0)
+	minV := MinOrdered(From(3, 1, 2)).OrElse(0)
+	maxV := MaxOrdered(From(3, 1, 2)).OrElse(0)
 	if minV != 1 || maxV != 3 {
 		t.Fatalf("min/max mismatch min=%d max=%d", minV, maxV)
 	}
 
-	collected := Collect(Of(1, 2, 3), func() []int { return make([]int, 0) }, func(dst *[]int, v int) {
+	collected := Collect(From(1, 2, 3), func() []int { return make([]int, 0) }, func(dst *[]int, v int) {
 		*dst = append(*dst, v)
 	}, nil)
 	if !reflect.DeepEqual(collected, []int{1, 2, 3}) {
 		t.Fatalf("collect mismatch: %v", collected)
 	}
 
-	reduced := ReduceWithCombiner(Of(1, 2, 3), 0, func(acc, v int) int { return acc + v }, nil)
+	reduced := ReduceWithCombiner(From(1, 2, 3), 0, func(acc, v int) int { return acc + v }, nil)
 	if reduced != 6 {
 		t.Fatalf("reduceWithCombiner mismatch: %d", reduced)
 	}
 }
 
 func TestStateAndClose(t *testing.T) {
-	s := Of(1, 2, 3).Parallel()
+	s := From(1, 2, 3).Parallel()
 	if !s.IsParallel() {
 		t.Fatalf("parallel state mismatch")
 	}
@@ -247,7 +254,7 @@ func TestStateAndClose(t *testing.T) {
 	}
 
 	steps := make([]int, 0, 2)
-	Of(1).
+	From(1).
 		OnClose(func() { steps = append(steps, 1) }).
 		OnClose(func() { steps = append(steps, 2) }).
 		Close()
@@ -255,34 +262,87 @@ func TestStateAndClose(t *testing.T) {
 		t.Fatalf("close order mismatch: %v", steps)
 	}
 
-	any, ok := Of(8, 9).FindAny()
+	any, ok := From(8, 9).Head()
 	if !ok || any != 8 {
 		t.Fatalf("findAny mismatch: any=%d ok=%v", any, ok)
 	}
 }
 
+func TestParallelMapOrdered(t *testing.T) {
+	got := MapPar(From(1, 2, 3, 4), 2, func(v int) int {
+		time.Sleep(5 * time.Millisecond)
+		return v * 10
+	}).Slice()
+
+	want := []int{10, 20, 30, 40}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("parallel ordered map mismatch: got=%v want=%v", got, want)
+	}
+}
+
+func TestParallelMapUnordered(t *testing.T) {
+	got := MapParUnordered(From(1, 2, 3, 4, 5), 3, func(v int) int {
+		time.Sleep(time.Duration(6-v) * time.Millisecond)
+		return v * 100
+	}).Slice()
+
+	if len(got) != 5 {
+		t.Fatalf("parallel unordered map size mismatch: %v", got)
+	}
+
+	counts := make(map[int]int)
+	for i := range got {
+		counts[got[i]]++
+	}
+	for _, expect := range []int{100, 200, 300, 400, 500} {
+		if counts[expect] != 1 {
+			t.Fatalf("parallel unordered map missing value=%d got=%v", expect, got)
+		}
+	}
+}
+
+func TestParallelForEach(t *testing.T) {
+	var sum int64
+	var mu sync.Mutex
+	seen := make(map[int]struct{})
+
+	From(1, 2, 3, 4, 5, 6).EachPar(3, func(v int) {
+		atomic.AddInt64(&sum, int64(v))
+		mu.Lock()
+		seen[v] = struct{}{}
+		mu.Unlock()
+	})
+
+	if sum != 21 {
+		t.Fatalf("parallel forEach sum mismatch: %d", sum)
+	}
+	if len(seen) != 6 {
+		t.Fatalf("parallel forEach seen mismatch: %v", seen)
+	}
+}
+
 func TestCollectorsFamily(t *testing.T) {
-	count := CollectWith(Of(1, 2, 3, 4), CountingCollector[int]())
+	count := CollectWith(From(1, 2, 3, 4), CountingCollector[int]())
 	if count != 4 {
 		t.Fatalf("counting collector mismatch: %d", count)
 	}
 
-	joined := CollectWith(Of("a", "b", "c"), JoiningCollector("-", "[", "]"))
+	joined := CollectWith(From("a", "b", "c"), JoiningCollector("-", "[", "]"))
 	if joined != "[a-b-c]" {
 		t.Fatalf("joining collector mismatch: %s", joined)
 	}
 
-	set := CollectWith(Of(1, 2, 2, 3), ToSetCollector[int]())
+	set := CollectWith(From(1, 2, 2, 3), ToSetCollector[int]())
 	if len(set) != 3 {
 		t.Fatalf("set collector mismatch: %v", set)
 	}
 
-	grouped := CollectWith(Of("go", "java", "c"), GroupingByCollector(func(v string) int { return len(v) }))
+	grouped := CollectWith(From("go", "java", "c"), GroupingByCollector(func(v string) int { return len(v) }))
 	if !reflect.DeepEqual(grouped[2], []string{"go"}) || !reflect.DeepEqual(grouped[1], []string{"c"}) {
 		t.Fatalf("groupingBy collector mismatch: %v", grouped)
 	}
 
-	parts := CollectWith(Of(1, 2, 3, 4), PartitioningByCollector(func(v int) bool { return v%2 == 0 }))
+	parts := CollectWith(From(1, 2, 3, 4), PartitioningByCollector(func(v int) bool { return v%2 == 0 }))
 	if !reflect.DeepEqual(parts[true], []int{2, 4}) || !reflect.DeepEqual(parts[false], []int{1, 3}) {
 		t.Fatalf("partitioningBy collector mismatch: %v", parts)
 	}
@@ -290,7 +350,7 @@ func TestCollectorsFamily(t *testing.T) {
 
 func TestCollectorsComposed(t *testing.T) {
 	mapped := CollectWith(
-		Of(1, 2, 3),
+		From(1, 2, 3),
 		MappingCollector(func(v int) string { return string(rune('a' + v - 1)) }, ToSliceCollector[string]()),
 	)
 	if !reflect.DeepEqual(mapped, []string{"a", "b", "c"}) {
@@ -298,7 +358,7 @@ func TestCollectorsComposed(t *testing.T) {
 	}
 
 	filtered := CollectWith(
-		Of(1, 2, 3, 4),
+		From(1, 2, 3, 4),
 		FilteringCollector(func(v int) bool { return v%2 == 0 }, ToSliceCollector[int]()),
 	)
 	if !reflect.DeepEqual(filtered, []int{2, 4}) {
@@ -306,7 +366,7 @@ func TestCollectorsComposed(t *testing.T) {
 	}
 
 	flatMapped := CollectWith(
-		Of("a,b", "c"),
+		From("a,b", "c"),
 		FlatMappingCollector(func(v string) []string {
 			if v == "a,b" {
 				return []string{"a", "b"}
@@ -319,7 +379,7 @@ func TestCollectorsComposed(t *testing.T) {
 	}
 
 	toMap := CollectWith(
-		Of("a", "aa", "b"),
+		From("a", "aa", "b"),
 		ToMapCollector(
 			func(v string) byte { return v[0] },
 			func(v string) int { return len(v) },
@@ -331,7 +391,7 @@ func TestCollectorsComposed(t *testing.T) {
 	}
 
 	groupMap := CollectWith(
-		Of("go", "java", "js"),
+		From("go", "java", "js"),
 		GroupingByMappingCollector(func(v string) int { return len(v) }, func(v string) byte { return v[0] }),
 	)
 	if !reflect.DeepEqual(groupMap[2], []byte{'g', 'j'}) {
@@ -340,47 +400,47 @@ func TestCollectorsComposed(t *testing.T) {
 }
 
 func TestCollectorsStatistics(t *testing.T) {
-	sumInt := CollectWith(Of(1, 2, 3), SummingIntCollector(func(v int) int { return v }))
+	sumInt := CollectWith(From(1, 2, 3), SummingIntCollector(func(v int) int { return v }))
 	if sumInt != 6 {
 		t.Fatalf("summingInt mismatch: %d", sumInt)
 	}
 
-	sumI64 := CollectWith(Of(int64(1), int64(2), int64(3)), SummingInt64Collector(func(v int64) int64 { return v }))
+	sumI64 := CollectWith(From(int64(1), int64(2), int64(3)), SummingInt64Collector(func(v int64) int64 { return v }))
 	if sumI64 != 6 {
 		t.Fatalf("summingInt64 mismatch: %d", sumI64)
 	}
 
-	sumF64 := CollectWith(Of(1.5, 2.5), SummingFloat64Collector(func(v float64) float64 { return v }))
+	sumF64 := CollectWith(From(1.5, 2.5), SummingFloat64Collector(func(v float64) float64 { return v }))
 	if sumF64 != 4.0 {
 		t.Fatalf("summingFloat64 mismatch: %f", sumF64)
 	}
 
-	avgInt := CollectWith(Of(1, 2, 3, 4), AveragingIntCollector(func(v int) int { return v }))
+	avgInt := CollectWith(From(1, 2, 3, 4), AveragingIntCollector(func(v int) int { return v }))
 	if avgInt != 2.5 {
 		t.Fatalf("averagingInt mismatch: %f", avgInt)
 	}
 
-	avgI64 := CollectWith(Of(int64(2), int64(4)), AveragingInt64Collector(func(v int64) int64 { return v }))
+	avgI64 := CollectWith(From(int64(2), int64(4)), AveragingInt64Collector(func(v int64) int64 { return v }))
 	if avgI64 != 3.0 {
 		t.Fatalf("averagingInt64 mismatch: %f", avgI64)
 	}
 
-	avgF64 := CollectWith(Of(1.0, 2.0, 5.0), AveragingFloat64Collector(func(v float64) float64 { return v }))
+	avgF64 := CollectWith(From(1.0, 2.0, 5.0), AveragingFloat64Collector(func(v float64) float64 { return v }))
 	if avgF64 != 8.0/3.0 {
 		t.Fatalf("averagingFloat64 mismatch: %f", avgF64)
 	}
 
-	intStats := CollectWith(Of(3, 1, 2), SummarizingIntCollector(func(v int) int { return v }))
+	intStats := CollectWith(From(3, 1, 2), SummarizingIntCollector(func(v int) int { return v }))
 	if intStats.Count != 3 || intStats.Sum != 6 || intStats.Min != 1 || intStats.Max != 3 || intStats.Average() != 2.0 {
 		t.Fatalf("summarizingInt mismatch: %+v", intStats)
 	}
 
-	longStats := CollectWith(Of(int64(7), int64(9)), SummarizingInt64Collector(func(v int64) int64 { return v }))
+	longStats := CollectWith(From(int64(7), int64(9)), SummarizingInt64Collector(func(v int64) int64 { return v }))
 	if longStats.Count != 2 || longStats.Sum != 16 || longStats.Min != 7 || longStats.Max != 9 || longStats.Average() != 8.0 {
 		t.Fatalf("summarizingInt64 mismatch: %+v", longStats)
 	}
 
-	doubleStats := CollectWith(Of(1.5, 2.5, 0.5), SummarizingFloat64Collector(func(v float64) float64 { return v }))
+	doubleStats := CollectWith(From(1.5, 2.5, 0.5), SummarizingFloat64Collector(func(v float64) float64 { return v }))
 	if doubleStats.Count != 3 || doubleStats.Sum != 4.5 || doubleStats.Min != 0.5 || doubleStats.Max != 2.5 || doubleStats.Average() != 1.5 {
 		t.Fatalf("summarizingFloat64 mismatch: %+v", doubleStats)
 	}
@@ -390,13 +450,13 @@ func TestCollectorsAndThenAndReducing(t *testing.T) {
 	collector := CollectingAndThen(ToSliceCollector[int](), func(items []int) int {
 		return len(items)
 	})
-	lenRes := CollectWith(Of(1, 2, 3), collector)
+	lenRes := CollectWith(From(1, 2, 3), collector)
 	if lenRes != 3 {
 		t.Fatalf("collectingAndThen mismatch: %d", lenRes)
 	}
 
 	reduced := CollectWith(
-		Of("a", "bb", "ccc"),
+		From("a", "bb", "ccc"),
 		ReducingCollector(0, func(v string) int { return len(v) }, func(a, b int) int { return a + b }),
 	)
 	if reduced != 6 {
@@ -405,18 +465,18 @@ func TestCollectorsAndThenAndReducing(t *testing.T) {
 }
 
 func TestCollectorsMinMaxGroupingDownstreamAndTeeing(t *testing.T) {
-	minOpt := CollectWith(Of(3, 1, 2), MinByCollector(func(a, b int) bool { return a < b }))
+	minOpt := CollectWith(From(3, 1, 2), MinByCollector(func(a, b int) bool { return a < b }))
 	if v := minOpt.OrElse(0); v != 1 {
 		t.Fatalf("minBy collector mismatch: %d", v)
 	}
 
-	maxOpt := CollectWith(Of(3, 1, 2), MaxByCollector(func(a, b int) bool { return a < b }))
+	maxOpt := CollectWith(From(3, 1, 2), MaxByCollector(func(a, b int) bool { return a < b }))
 	if v := maxOpt.OrElse(0); v != 3 {
 		t.Fatalf("maxBy collector mismatch: %d", v)
 	}
 
 	groupedSum := CollectWith(
-		Of(1, 2, 3, 4, 5),
+		From(1, 2, 3, 4, 5),
 		GroupingByDownstreamCollector(
 			func(v int) bool { return v%2 == 0 },
 			SummingIntCollector(func(v int) int { return v }),
@@ -427,7 +487,7 @@ func TestCollectorsMinMaxGroupingDownstreamAndTeeing(t *testing.T) {
 	}
 
 	avgLen := CollectWith(
-		Of("a", "bb", "ccc"),
+		From("a", "bb", "ccc"),
 		TeeingCollector(
 			CountingCollector[string](),
 			SummingIntCollector(func(v string) int { return len(v) }),
@@ -445,106 +505,106 @@ func TestCollectorsMinMaxGroupingDownstreamAndTeeing(t *testing.T) {
 }
 
 func TestSparkLikeSetAndZipOperators(t *testing.T) {
-	if got := Union(Of(1, 2), Of(3, 4)).CollectToSlice(); !reflect.DeepEqual(got, []int{1, 2, 3, 4}) {
+	if got := Union(From(1, 2), From(3, 4)).Slice(); !reflect.DeepEqual(got, []int{1, 2, 3, 4}) {
 		t.Fatalf("union mismatch: %v", got)
 	}
 
-	inter := Intersection(Of(1, 2, 3, 3), Of(3, 4)).CollectToSlice()
+	inter := Intersection(From(1, 2, 3, 3), From(3, 4)).Slice()
 	if !reflect.DeepEqual(inter, []int{3, 3}) {
 		t.Fatalf("intersection mismatch: %v", inter)
 	}
 
-	sub := Subtract(Of(1, 2, 3), Of(2)).CollectToSlice()
+	sub := Subtract(From(1, 2, 3), From(2)).Slice()
 	if !reflect.DeepEqual(sub, []int{1, 3}) {
 		t.Fatalf("subtract mismatch: %v", sub)
 	}
 
-	car := Cartesian(Of(1, 2), Of("a", "b")).CollectToSlice()
+	car := Cartesian(From(1, 2), From("a", "b")).Slice()
 	if len(car) != 4 {
 		t.Fatalf("cartesian mismatch: %v", car)
 	}
 
-	zipped := Zip(Of(1, 2, 3), Of("a", "b")).CollectToSlice()
+	zipped := Zip(From(1, 2, 3), From("a", "b")).Slice()
 	if !reflect.DeepEqual(zipped, []Tuple2[int, string]{{1, "a"}, {2, "b"}}) {
 		t.Fatalf("zip mismatch: %v", zipped)
 	}
 
-	idx := ZipWithIndex(Of("x", "y")).CollectToSlice()
+	idx := ZipWithIndex(From("x", "y")).Slice()
 	if !reflect.DeepEqual(idx, []Tuple2[string, int]{{"x", 0}, {"y", 1}}) {
 		t.Fatalf("zipWithIndex mismatch: %v", idx)
 	}
 }
 
 func TestSparkLikeSortSampleAndTake(t *testing.T) {
-	sorted := SortBy(Of("bbb", "a", "cc"), func(v string) int { return len(v) }, true).CollectToSlice()
+	sorted := SortBy(From("bbb", "a", "cc"), func(v string) int { return len(v) }, true).Slice()
 	if !reflect.DeepEqual(sorted, []string{"a", "cc", "bbb"}) {
 		t.Fatalf("sortBy mismatch: %v", sorted)
 	}
 
-	sampled := Sample(Of(1, 2, 3, 4, 5), false, 1.0, 1).CollectToSlice()
+	sampled := Sample(From(1, 2, 3, 4, 5), false, 1.0, 1).Slice()
 	if !reflect.DeepEqual(sampled, []int{1, 2, 3, 4, 5}) {
 		t.Fatalf("sample mismatch: %v", sampled)
 	}
 
-	glom := Glom(Of(1, 2, 3, 4, 5), 2).CollectToSlice()
+	glom := Glom(From(1, 2, 3, 4, 5), 2).Slice()
 	if len(glom) != 3 || !reflect.DeepEqual(glom[0], []int{1, 2}) || !reflect.DeepEqual(glom[2], []int{5}) {
 		t.Fatalf("glom mismatch: %v", glom)
 	}
 
-	take := Of(5, 4, 3).Take(2)
+	take := From(5, 4, 3).Take(2)
 	if !reflect.DeepEqual(take, []int{5, 4}) {
 		t.Fatalf("take mismatch: %v", take)
 	}
 
-	first, ok := Of(9, 8).First()
+	first, ok := From(9, 8).First()
 	if !ok || first != 9 {
 		t.Fatalf("first mismatch: %d %v", first, ok)
 	}
 
-	if !reflect.DeepEqual(TakeOrdered(Of(3, 1, 2), 2), []int{1, 2}) {
+	if !reflect.DeepEqual(TakeOrdered(From(3, 1, 2), 2), []int{1, 2}) {
 		t.Fatalf("takeOrdered mismatch")
 	}
-	if !reflect.DeepEqual(Top(Of(3, 1, 2), 2), []int{3, 2}) {
+	if !reflect.DeepEqual(Top(From(3, 1, 2), 2), []int{3, 2}) {
 		t.Fatalf("top mismatch")
 	}
 }
 
 func TestSparkLikePairOperators(t *testing.T) {
-	pairs := Of(
+	pairs := From(
 		Pair[string, int]{Key: "a", Value: 1},
 		Pair[string, int]{Key: "a", Value: 2},
 		Pair[string, int]{Key: "b", Value: 3},
 	)
 
-	mappedVals := MapValues(pairs, func(v int) int { return v * 10 }).CollectToSlice()
+	mappedVals := MapValues(pairs, func(v int) int { return v * 10 }).Slice()
 	if mappedVals[0].Value != 10 || mappedVals[2].Value != 30 {
 		t.Fatalf("mapValues mismatch: %v", mappedVals)
 	}
 
-	flatVals := FlatMapValues(pairs, func(v int) []int { return []int{v, -v} }).CollectToSlice()
+	flatVals := FlatMapValues(pairs, func(v int) []int { return []int{v, -v} }).Slice()
 	if len(flatVals) != 6 {
 		t.Fatalf("flatMapValues mismatch: %v", flatVals)
 	}
 
-	grp := GroupByKey(pairs).CollectToSlice()
+	grp := GroupByKey(pairs).Slice()
 	if len(grp) != 2 {
 		t.Fatalf("groupByKey mismatch: %v", grp)
 	}
 
-	reduced := ReduceByKey(pairs, func(a, b int) int { return a + b }).CollectToSlice()
+	reduced := ReduceByKey(pairs, func(a, b int) int { return a + b }).Slice()
 	if len(reduced) != 2 {
 		t.Fatalf("reduceByKey mismatch: %v", reduced)
 	}
 
-	folded := FoldByKey(pairs, 10, func(a, b int) int { return a + b }).CollectToSlice()
+	folded := FoldByKey(pairs, 10, func(a, b int) int { return a + b }).Slice()
 	if len(folded) != 2 {
 		t.Fatalf("foldByKey mismatch: %v", folded)
 	}
 
-	sortedPair := SortByKey(Of(
+	sortedPair := SortByKey(From(
 		Pair[int, string]{Key: 2, Value: "b"},
 		Pair[int, string]{Key: 1, Value: "a"},
-	), true).CollectToSlice()
+	), true).Slice()
 	if sortedPair[0].Key != 1 {
 		t.Fatalf("sortByKey mismatch: %v", sortedPair)
 	}
@@ -552,61 +612,61 @@ func TestSparkLikePairOperators(t *testing.T) {
 	if cnt := CountByKey(pairs); cnt["a"] != 2 || cnt["b"] != 1 {
 		t.Fatalf("countByKey mismatch: %v", cnt)
 	}
-	if cnt := CountByValue(Of(1, 1, 2)); cnt[1] != 2 || cnt[2] != 1 {
+	if cnt := CountByValue(From(1, 1, 2)); cnt[1] != 2 || cnt[2] != 1 {
 		t.Fatalf("countByValue mismatch: %v", cnt)
 	}
 
-	ks := Keys(pairs).CollectToSlice()
-	vs := Values(pairs).CollectToSlice()
+	ks := Keys(pairs).Slice()
+	vs := Values(pairs).Slice()
 	if len(ks) != 3 || len(vs) != 3 {
 		t.Fatalf("keys/values mismatch: %v %v", ks, vs)
 	}
 }
 
 func TestSparkLikeJoinFamilyAndCogroup(t *testing.T) {
-	left := Of(
+	left := From(
 		Pair[string, int]{Key: "a", Value: 1},
 		Pair[string, int]{Key: "b", Value: 2},
 	)
-	right := Of(
+	right := From(
 		Pair[string, string]{Key: "a", Value: "x"},
 		Pair[string, string]{Key: "c", Value: "y"},
 	)
 
-	inner := Join(left, right).CollectToSlice()
+	inner := Join(left, right).Slice()
 	if len(inner) != 1 || inner[0].Key != "a" || inner[0].Value.First != 1 || inner[0].Value.Second != "x" {
 		t.Fatalf("join mismatch: %v", inner)
 	}
 
-	loj := LeftOuterJoin(left, right).CollectToSlice()
+	loj := LeftOuterJoin(left, right).Slice()
 	if len(loj) != 2 {
 		t.Fatalf("leftOuterJoin size mismatch: %v", loj)
 	}
 
-	roj := RightOuterJoin(left, right).CollectToSlice()
+	roj := RightOuterJoin(left, right).Slice()
 	if len(roj) != 2 {
 		t.Fatalf("rightOuterJoin size mismatch: %v", roj)
 	}
 
-	foj := FullOuterJoin(left, right).CollectToSlice()
+	foj := FullOuterJoin(left, right).Slice()
 	if len(foj) != 3 {
 		t.Fatalf("fullOuterJoin size mismatch: %v", foj)
 	}
 
-	cg := Cogroup(left, right).CollectToSlice()
+	cg := Cogroup(left, right).Slice()
 	if len(cg) != 3 {
 		t.Fatalf("cogroup mismatch: %v", cg)
 	}
 }
 
 func TestSparkLikeAggregateCombinePartitionAndLookup(t *testing.T) {
-	pairs := Of(
+	pairs := From(
 		Pair[string, int]{Key: "a", Value: 1},
 		Pair[string, int]{Key: "a", Value: 2},
 		Pair[string, int]{Key: "b", Value: 3},
 	)
 
-	agg := AggregateByKey(pairs, 0, func(a, b int) int { return a + b }, nil).CollectToSlice()
+	agg := AggregateByKey(pairs, 0, func(a, b int) int { return a + b }, nil).Slice()
 	if len(agg) != 2 {
 		t.Fatalf("aggregateByKey mismatch: %v", agg)
 	}
@@ -616,12 +676,12 @@ func TestSparkLikeAggregateCombinePartitionAndLookup(t *testing.T) {
 		func(v int) int { return v },
 		func(c, v int) int { return c + v },
 		nil,
-	).CollectToSlice()
+	).Slice()
 	if len(combined) != 2 {
 		t.Fatalf("combineByKey mismatch: %v", combined)
 	}
 
-	keyed := KeyBy(Of("go", "java"), func(v string) int { return len(v) }).CollectToSlice()
+	keyed := KeyBy(From("go", "java"), func(v string) int { return len(v) }).Slice()
 	if len(keyed) != 2 || keyed[0].Key != 2 {
 		t.Fatalf("keyBy mismatch: %v", keyed)
 	}
@@ -636,25 +696,377 @@ func TestSparkLikeAggregateCombinePartitionAndLookup(t *testing.T) {
 		t.Fatalf("collectAsMap mismatch: %v", asMap)
 	}
 
-	mp := MapPartitions(Of(1, 2, 3), func(part []int) []int {
+	mp := MapPartitions(From(1, 2, 3), func(part []int) []int {
 		return []int{len(part)}
-	}).CollectToSlice()
+	}).Slice()
 	if !reflect.DeepEqual(mp, []int{3}) {
 		t.Fatalf("mapPartitions mismatch: %v", mp)
 	}
 
-	mpi := MapPartitionsWithIndex(Of(1, 2), func(idx int, part []int) []int {
+	mpi := MapPartitionsWithIndex(From(1, 2), func(idx int, part []int) []int {
 		return []int{idx, len(part)}
-	}).CollectToSlice()
+	}).Slice()
 	if !reflect.DeepEqual(mpi, []int{0, 2}) {
 		t.Fatalf("mapPartitionsWithIndex mismatch: %v", mpi)
 	}
 
 	hit := 0
-	ForEachPartition(Of(1, 2, 3), func(part []int) {
+	ForEachPartition(From(1, 2, 3), func(part []int) {
 		hit = len(part)
 	})
 	if hit != 3 {
 		t.Fatalf("forEachPartition mismatch: %d", hit)
+	}
+}
+
+func TestGoPlusContextAndChannel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	produced := 0
+	stream := FromContext(ctx, func(ctx context.Context, emit func(int) bool) {
+		for i := 1; i <= 10; i++ {
+			produced++
+			if i == 4 {
+				cancel()
+			}
+			if !emit(i) {
+				return
+			}
+		}
+	})
+
+	got := stream.Slice()
+	if !reflect.DeepEqual(got, []int{1, 2, 3}) {
+		t.Fatalf("fromContext mismatch: %v", got)
+	}
+	if produced < 3 {
+		t.Fatalf("fromContext should produce values before cancellation: %d", produced)
+	}
+
+	src := make(chan int, 3)
+	src <- 1
+	src <- 2
+	src <- 3
+	close(src)
+	fromCh := FromChan((<-chan int)(src)).Slice()
+	if !reflect.DeepEqual(fromCh, []int{1, 2, 3}) {
+		t.Fatalf("fromChan mismatch: %v", fromCh)
+	}
+
+	ch := From(4, 5, 6).ToChan(1)
+	gotCh := make([]int, 0, 3)
+	for v := range ch {
+		gotCh = append(gotCh, v)
+	}
+	if !reflect.DeepEqual(gotCh, []int{4, 5, 6}) {
+		t.Fatalf("toChan mismatch: %v", gotCh)
+	}
+
+	a := make(chan int, 2)
+	b := make(chan int, 2)
+	a <- 10
+	a <- 11
+	b <- 20
+	b <- 21
+	close(a)
+	close(b)
+	merged := make([]int, 0, 4)
+	for v := range MergeChan((<-chan int)(a), (<-chan int)(b)) {
+		merged = append(merged, v)
+	}
+	if len(merged) != 4 {
+		t.Fatalf("mergeChan size mismatch: %v", merged)
+	}
+}
+
+func TestGoPlusErrorAndTapError(t *testing.T) {
+	_, err := MapE(From(1, 2, 3), func(v int) (int, error) {
+		if v == 2 {
+			return 0, errors.New("boom")
+		}
+		return v * 2, nil
+	})
+	if err == nil {
+		t.Fatalf("mapE should fail")
+	}
+
+	flat, err := FlatMapE(From(1, 2), func(v int) ([]int, error) {
+		return []int{v, v * 10}, nil
+	})
+	if err != nil {
+		t.Fatalf("flatMapE unexpected err: %v", err)
+	}
+	if got := flat.Slice(); !reflect.DeepEqual(got, []int{1, 10, 2, 20}) {
+		t.Fatalf("flatMapE mismatch: %v", got)
+	}
+
+	forEachErr := From(1, 2, 3).ForEachE(func(v int) error {
+		if v == 3 {
+			return errors.New("stop")
+		}
+		return nil
+	})
+	if forEachErr == nil {
+		t.Fatalf("forEachE should fail")
+	}
+
+	collected, err := CollectE(From(1, 2, 3), func() []int { return make([]int, 0) }, func(dst *[]int, v int) error {
+		*dst = append(*dst, v)
+		return nil
+	}, nil)
+	if err != nil || !reflect.DeepEqual(collected, []int{1, 2, 3}) {
+		t.Fatalf("collectE mismatch: data=%v err=%v", collected, err)
+	}
+
+	hit := false
+	_ = TapError(errors.New("x"), func(error) { hit = true })
+	if !hit {
+		t.Fatalf("tapError should invoke handler")
+	}
+}
+
+func TestGoPlusConcurrencyAPIs(t *testing.T) {
+	res := MapPar(From(1, 2, 3), 2, func(v int) int { return v * 3 }).Slice()
+	if !reflect.DeepEqual(res, []int{3, 6, 9}) {
+		t.Fatalf("parallelMap mismatch: %v", res)
+	}
+
+	flat := FlatMapPar(From(1, 2, 3), 2, func(v int) []int { return []int{v, -v} }).Slice()
+	if !reflect.DeepEqual(flat, []int{1, -1, 2, -2, 3, -3}) {
+		t.Fatalf("parallelFlatMap mismatch: %v", flat)
+	}
+}
+
+func TestGoPlusTimeAndBackpressure(t *testing.T) {
+	window := Window(From(1, 2, 3, 4, 5), 2).Slice()
+	if len(window) != 3 || !reflect.DeepEqual(window[0], []int{1, 2}) || !reflect.DeepEqual(window[2], []int{5}) {
+		t.Fatalf("window mismatch: %v", window)
+	}
+
+	throttled := From(1, 2, 3).Throttle(20 * time.Millisecond).Slice()
+	if len(throttled) != 1 {
+		t.Fatalf("throttle mismatch: %v", throttled)
+	}
+
+	debounced := From(1, 2, 3).Debounce(10 * time.Millisecond).Slice()
+	if !reflect.DeepEqual(debounced, []int{3}) {
+		t.Fatalf("debounce mismatch: %v", debounced)
+	}
+
+	sampled := From(8, 9, 10).SampleEvery(5 * time.Millisecond).Slice()
+	if len(sampled) == 0 {
+		t.Fatalf("sampleEvery should emit data")
+	}
+
+	if got := From(1, 2, 3).Buffer(2).Slice(); !reflect.DeepEqual(got, []int{1, 2, 3}) {
+		t.Fatalf("buffer mismatch: %v", got)
+	}
+	if got := From(1, 2, 3).BlockWhenFull(1).Slice(); !reflect.DeepEqual(got, []int{1, 2, 3}) {
+		t.Fatalf("blockWhenFull mismatch: %v", got)
+	}
+	dropped := From(1, 2, 3, 4, 5).DropWhenFull(1).Slice()
+	if len(dropped) == 0 {
+		t.Fatalf("dropWhenFull should keep at least one item")
+	}
+	latest := From(1, 2, 3, 4).LatestOnly().Slice()
+	if len(latest) == 0 || latest[len(latest)-1] != 4 {
+		t.Fatalf("latestOnly mismatch: %v", latest)
+	}
+}
+
+func TestGoPlusIOAndObserve(t *testing.T) {
+	lines := FromReaderLines(strings.NewReader("a\nb\nc\n")).Slice()
+	if !reflect.DeepEqual(lines, []string{"a", "b", "c"}) {
+		t.Fatalf("fromReaderLines mismatch: %v", lines)
+	}
+
+	var buf bytes.Buffer
+	err := ToWriter(From(1, 2, 3), &buf, func(v int) string { return strings.Repeat("x", v) })
+	if err != nil || buf.String() != "xxxxxx" {
+		t.Fatalf("toWriter mismatch: out=%q err=%v", buf.String(), err)
+	}
+
+	bres := MapBytes(From([]byte("a"), []byte("b")), func(b []byte) []byte {
+		return append(b, '!')
+	}).Slice()
+	if string(bres[0]) != "a!" || string(bres[1]) != "b!" {
+		t.Fatalf("mapBytes mismatch: %q %q", string(bres[0]), string(bres[1]))
+	}
+
+	ResetMetrics()
+	traceHit := false
+	SetTraceSink(func(ev TraceEvent) {
+		if ev.Span == "demo" && ev.Count > 0 {
+			traceHit = true
+		}
+	})
+
+	_ = From(1, 2, 3).
+		Tap(func(int) {}).
+		WithMetrics("m1").
+		WithTrace("demo").
+		Slice()
+
+	if GetMetricCount("m1") != 3 {
+		t.Fatalf("metrics mismatch: %d", GetMetricCount("m1"))
+	}
+	if !traceHit {
+		t.Fatalf("trace should be observed")
+	}
+}
+
+func TestGoPlusFanOut(t *testing.T) {
+	in := make(chan int, 3)
+	in <- 7
+	in <- 8
+	in <- 9
+	close(in)
+	outs := FanOut((<-chan int)(in), 2, 3)
+	if len(outs) != 2 {
+		t.Fatalf("fanOut size mismatch: %d", len(outs))
+	}
+	left := make([]int, 0, 3)
+	right := make([]int, 0, 3)
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for v := range outs[0] {
+			left = append(left, v)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for v := range outs[1] {
+			right = append(right, v)
+		}
+	}()
+	wg.Wait()
+	if !reflect.DeepEqual(left, []int{7, 8, 9}) || !reflect.DeepEqual(right, []int{7, 8, 9}) {
+		t.Fatalf("fanOut mismatch: left=%v right=%v", left, right)
+	}
+}
+
+func TestGoPlusCtxChannelControls(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := Generate(func() int { return 1 }).ToChanCtx(ctx, 0)
+	_, ok := <-ch
+	if !ok {
+		t.Fatalf("toChanCtx should produce data before cancel")
+	}
+	cancel()
+	select {
+	case _, ok := <-ch:
+		if ok {
+			t.Fatalf("toChanCtx should close after cancel")
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatalf("toChanCtx cancel timeout")
+	}
+
+	in := make(chan int)
+	_ = FanOutDrop((<-chan int)(in), 2, 1)
+	sendDone := make(chan struct{})
+	go func() {
+		defer close(sendDone)
+		for i := 0; i < 100; i++ {
+			in <- i
+		}
+		close(in)
+	}()
+	select {
+	case <-sendDone:
+		// pass
+	case <-time.After(300 * time.Millisecond):
+		t.Fatalf("fanOutDrop should not block producer with slow consumers")
+	}
+
+	mctx, mcancel := context.WithCancel(context.Background())
+	mch := make(chan int)
+	go func() {
+		defer close(mch)
+		for i := 0; i < 1000; i++ {
+			mch <- i
+		}
+	}()
+	merged := MergeChanCtx(mctx, (<-chan int)(mch))
+	mcancel()
+	select {
+	case _, ok := <-merged:
+		if ok {
+			for range merged {
+			}
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatalf("mergeChanCtx cancel timeout")
+	}
+}
+
+func TestGoStyleDirectNames(t *testing.T) {
+	v := 7
+	if got := FromPointer(&v).Slice(); !reflect.DeepEqual(got, []int{7}) {
+		t.Fatalf("fromPointer mismatch: %v", got)
+	}
+
+	chained := Chain(From(1, 2), From(3), Empty[int]()).All()
+	if !reflect.DeepEqual(chained, []int{1, 2, 3}) {
+		t.Fatalf("chain mismatch: %v", chained)
+	}
+
+	s := From(1, 2, 3, 4).Where(func(v int) bool { return v%2 == 0 })
+	if s.Len() != 2 {
+		t.Fatalf("len mismatch: %d", s.Len())
+	}
+	if !s.Any(func(v int) bool { return v == 2 }) || !s.Every(func(v int) bool { return v%2 == 0 }) {
+		t.Fatalf("any/every mismatch")
+	}
+	if !s.None(func(v int) bool { return v%2 == 1 }) {
+		t.Fatalf("none mismatch")
+	}
+
+	var total int
+	From(1, 2, 3).Each(func(v int) { total += v })
+	if total != 6 {
+		t.Fatalf("each mismatch: %d", total)
+	}
+
+	par := MapPar(From(1, 2, 3), 2, func(v int) int { return v * 2 }).Slice()
+	if !reflect.DeepEqual(par, []int{2, 4, 6}) {
+		t.Fatalf("mapPar mismatch: %v", par)
+	}
+
+	uniq := Unique(From(1, 1, 2, 2, 3)).Slice()
+	if !reflect.DeepEqual(uniq, []int{1, 2, 3}) {
+		t.Fatalf("unique mismatch: %v", uniq)
+	}
+
+	mapped := MapFn(From(1, 2, 3), func(v int) int { return v + 1 }).Slice()
+	if !reflect.DeepEqual(mapped, []int{2, 3, 4}) {
+		t.Fatalf("mapFn mismatch: %v", mapped)
+	}
+
+	fmapped := FlatMapFn(From(1, 2), func(v int) Stream[int] { return From(v, -v) }).Slice()
+	if !reflect.DeepEqual(fmapped, []int{1, -1, 2, -2}) {
+		t.Fatalf("flatMapFn mismatch: %v", fmapped)
+	}
+
+	head, ok := From(9, 8).Head()
+	if !ok || head != 9 {
+		t.Fatalf("head mismatch: %d %v", head, ok)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	ctxVals := FromCtx(ctx, func(ctx context.Context, emit func(int) bool) {
+		_ = emit(1)
+	}).Slice()
+	if len(ctxVals) != 0 {
+		t.Fatalf("fromCtx mismatch: %v", ctxVals)
+	}
+
+	batch := Batch(From(1, 2, 3), 2).Slice()
+	if len(batch) != 2 || !reflect.DeepEqual(batch[0], []int{1, 2}) {
+		t.Fatalf("batch mismatch: %v", batch)
 	}
 }

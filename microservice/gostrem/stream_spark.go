@@ -21,7 +21,7 @@ func Subtract[T comparable](left, right Stream[T]) Stream[T] {
 }
 
 func Cartesian[T any, U any](left Stream[T], right Stream[U]) Stream[Tuple2[T, U]] {
-	items := right.CollectToSlice()
+	items := right.Slice()
 	seq := func(yield func(Tuple2[T, U]) bool) {
 		stop := false
 		left.seq(func(v T) bool {
@@ -42,8 +42,8 @@ func Cartesian[T any, U any](left Stream[T], right Stream[U]) Stream[Tuple2[T, U
 }
 
 func Zip[T any, U any](left Stream[T], right Stream[U]) Stream[Tuple2[T, U]] {
-	l := left.CollectToSlice()
-	r := right.CollectToSlice()
+	l := left.Slice()
+	r := right.Slice()
 	n := len(l)
 	if len(r) < n {
 		n = len(r)
@@ -248,14 +248,14 @@ func CountByKey[K comparable, V any](s Stream[Pair[K, V]]) map[K]int64 {
 	return out
 }
 
-func (s Stream[T]) Take(n int) []T   { return s.Limit(n).CollectToSlice() }
-func (s Stream[T]) First() (T, bool) { return s.FindFirst() }
+func (s Stream[T]) Take(n int) []T   { return s.Limit(n).Slice() }
+func (s Stream[T]) First() (T, bool) { return s.Head() }
 
 func TakeOrdered[T cmp.Ordered](s Stream[T], n int) []T {
 	if n <= 0 {
 		return []T{}
 	}
-	items := s.CollectToSlice()
+	items := s.Slice()
 	sort.Slice(items, func(i, j int) bool { return items[i] < items[j] })
 	if n > len(items) {
 		n = len(items)
@@ -267,7 +267,7 @@ func Top[T cmp.Ordered](s Stream[T], n int) []T {
 	if n <= 0 {
 		return []T{}
 	}
-	items := s.CollectToSlice()
+	items := s.Slice()
 	sort.Slice(items, func(i, j int) bool { return items[i] > items[j] })
 	if n > len(items) {
 		n = len(items)
@@ -470,19 +470,19 @@ func MapPartitions[T any, R any](s Stream[T], fn func([]T) []R) Stream[R] {
 	if fn == nil {
 		return Empty[R]()
 	}
-	return FromSlice(fn(s.CollectToSlice()))
+	return FromSlice(fn(s.Slice()))
 }
 
 func MapPartitionsWithIndex[T any, R any](s Stream[T], fn func(int, []T) []R) Stream[R] {
 	if fn == nil {
 		return Empty[R]()
 	}
-	return FromSlice(fn(0, s.CollectToSlice()))
+	return FromSlice(fn(0, s.Slice()))
 }
 
 func ForEachPartition[T any](s Stream[T], consumer func([]T)) {
 	if consumer == nil {
 		return
 	}
-	consumer(s.CollectToSlice())
+	consumer(s.Slice())
 }
