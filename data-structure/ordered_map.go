@@ -1,7 +1,10 @@
-package sqlx
+package main
 
 import (
+	"cmp"
 	"iter"
+	"maps"
+	"slices"
 )
 
 type OrderedMap[K comparable, V any] struct {
@@ -14,6 +17,28 @@ func NewOrderedMap[K comparable, V any]() *OrderedMap[K, V] {
 		keys: make([]K, 0),
 		data: make(map[K]V),
 	}
+}
+
+func OrderedMapFrom[K cmp.Ordered, V any](m map[K]V) *OrderedMap[K, V] {
+	keys := slices.Collect(maps.Keys(m))
+	slices.Sort(keys)
+
+	orderedMap := NewOrderedMap[K, V]()
+	for _, k := range keys {
+		orderedMap.Set(k, m[k])
+	}
+	return orderedMap
+}
+
+func OrderedMapFromPairs[K comparable, V any](pairs ...struct {
+	Key   K
+	Value V
+}) *OrderedMap[K, V] {
+	orderedMap := NewOrderedMap[K, V]()
+	for _, pair := range pairs {
+		orderedMap.Set(pair.Key, pair.Value)
+	}
+	return orderedMap
 }
 
 func (m *OrderedMap[K, V]) Set(key K, value V) {

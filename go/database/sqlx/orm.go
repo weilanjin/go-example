@@ -18,11 +18,20 @@ type Mapping struct {
 	Value  any // insert, update value
 }
 
+type Where []struct {
+	Clause string
+	Value  any
+}
+
 type SQL struct {
 	*sql.DB
 	BatchSize        int  // 批量插入的大小，默认为一次性插入所有行
 	SlowSQLThreshold int  // 单位毫秒，超过该值的 SQL 将被记录为慢 SQL
 	Debug            bool // 是否启用调试模式，打印 SQL 语句和参数
+}
+
+func NewSQL(db *sql.DB) *SQL {
+	return &SQL{DB: db}
 }
 
 // Insert inserts rows while ignoring specified columns
@@ -94,17 +103,15 @@ func (db *SQL) Insert(omits []string, rows ...Row) (int64, error) {
 
 // Delete deletes rows based on a column and its value
 // 根据列和值删除行
-func (db *SQL) Delete(table string, where *OrderedMap[string, any]) (int64, error) {
-	if where == nil {
-		where = NewOrderedMap[string, any]()
-	}
+func (db *SQL) Delete(table string, where Where) (int64, error) {
+	whereClauses := make([]string, 0, len(where))
+	values := make([]any, 0, len(where))
 
-	whereClauses := make([]string, 0, where.Len())
-	values := make([]any, 0, where.Len())
-
-	for k, v := range where.All() {
-		whereClauses = append(whereClauses, k)
-		values = append(values, v)
+	for _, w := range where {
+		whereClauses = append(whereClauses, w.Clause)
+		if w.Value != nil {
+			values = append(values, w.Value)
+		}
 	}
 
 	var whereSQL string
@@ -121,12 +128,9 @@ func (db *SQL) Delete(table string, where *OrderedMap[string, any]) (int64, erro
 
 // Update updates rows based on a column and its value
 // 根据列和值更新行
-func (db *SQL) Update(table string, where *OrderedMap[string, any], m map[string]any) (int64, error) {
+func (db *SQL) Update(table string, where Where, m map[string]any) (int64, error) {
 	if len(m) == 0 {
 		return 0, fmt.Errorf("no fields to update")
-	}
-	if where == nil {
-		where = NewOrderedMap[string, any]()
 	}
 
 	setClauses := make([]string, 0, len(m))
@@ -137,11 +141,13 @@ func (db *SQL) Update(table string, where *OrderedMap[string, any], m map[string
 		values = append(values, value)
 	}
 
-	whereClauses := make([]string, 0, where.Len())
-	whereValues := make([]any, 0, where.Len())
-	for k, v := range where.All() {
-		whereClauses = append(whereClauses, k)
-		whereValues = append(whereValues, v)
+	whereClauses := make([]string, 0, len(where))
+	whereValues := make([]any, 0, len(where))
+	for _, w := range where {
+		whereClauses = append(whereClauses, w.Clause)
+		if w.Value != nil {
+			whereValues = append(whereValues, w.Value)
+		}
 	}
 
 	var whereSQL string
@@ -150,7 +156,7 @@ func (db *SQL) Update(table string, where *OrderedMap[string, any], m map[string
 	}
 
 	query := fmt.Sprintf(
-		"UPDATE %s SET %s WHERE %s",
+		"UPDATE %s SET %s %s",
 		table,
 		strings.Join(setClauses, ", "),
 		whereSQL,
@@ -168,9 +174,17 @@ func (db *SQL) Update(table string, where *OrderedMap[string, any], m map[string
 	return rowsAffected, nil
 }
 
-func List[T Row](where string, args []any, newRow func() T) ([]T, error) {
-	if where != "" {
-		where = "WHERE " + where
+func List[T Row](where Where, args []any, newRow func() T) ([]T, error) {
+	var whereSQL string
+	if len(where) > 0 {
+		whereClauses := make([]string, 0, len(where))
+		for _, w := range where {
+			whereClauses = append(whereClauses, w.Clause)
+			if w.Value != nil {
+				args = append(args, w.Value)
+			}
+		}
+		whereSQL = "WHERE " + strings.Join(whereClauses, " AND ")
 	}
 
 	prototype := newRow()
@@ -184,7 +198,7 @@ func List[T Row](where string, args []any, newRow func() T) ([]T, error) {
 		"SELECT %s FROM %s %s",
 		strings.Join(columns, ", "),
 		prototype.TableName(),
-		where,
+		whereSQL,
 	)
 
 	rows, err := db.Query(query, args...)
