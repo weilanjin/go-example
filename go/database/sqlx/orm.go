@@ -27,9 +27,9 @@ type SQL struct {
 
 // Insert inserts rows while ignoring specified columns
 // 批量插入数据时忽略指定的列
-func (db *SQL) Insert(omits []string, rows ...Row) error {
+func (db *SQL) Insert(omits []string, rows ...Row) (int64, error) {
 	if len(rows) == 0 {
-		return fmt.Errorf("no rows to insert")
+		return 0, fmt.Errorf("no rows to insert")
 	}
 
 	batchSize := db.BatchSize
@@ -47,13 +47,12 @@ func (db *SQL) Insert(omits []string, rows ...Row) error {
 		}
 	}
 
+	var totalRowsAffected int64
+
 	// Process rows in batches
 	// 分批处理行数据
 	for i := 0; i < len(rows); i += batchSize {
-		end := i + batchSize
-		if end > len(rows) {
-			end = len(rows)
-		}
+		end := min(i+batchSize, len(rows))
 
 		var placeholders []string
 		var values []any
@@ -79,67 +78,94 @@ func (db *SQL) Insert(omits []string, rows ...Row) error {
 			strings.Join(placeholders, ", "),
 		)
 
-		if _, err := db.Exec(query, values...); err != nil {
-			return err
+		res, err := db.Exec(query, values...)
+		if err != nil {
+			return 0, err
 		}
+		rowsAffected, err := res.RowsAffected()
+		if err != nil {
+			return 0, err
+		}
+		totalRowsAffected += rowsAffected
 	}
 
-	return nil
+	return totalRowsAffected, nil
 }
 
 // Delete deletes rows based on a column and its value
 // 根据列和值删除行
-func (db *SQL) Delete(table string, where OrderedMap[string, any]) error {
-	var (
-		whereClauses []string
-		values       []any
-	)
+func (db *SQL) Delete(table string, where *OrderedMap[string, any]) (int64, error) {
+	if where == nil {
+		where = NewOrderedMap[string, any]()
+	}
+
+	whereClauses := make([]string, 0, where.Len())
+	values := make([]any, 0, where.Len())
 
 	for k, v := range where.All() {
-		if v == nil {
-			whereClauses = append(whereClauses, k)
-		} else {
-			whereClauses = append(whereClauses, fmt.Sprintf("%s = ?", k))
-			values = append(values, v)
-		}
+		whereClauses = append(whereClauses, k)
+		values = append(values, v)
 	}
 
 	var whereSQL string
 	if len(whereClauses) > 0 {
-		whereSQL = "WHERE " + strings.Join(whereClauses, " AND ")
+		whereSQL = "WHERE " + strings.Join(whereClauses, " ")
 	}
 
-	_, err := db.Exec(fmt.Sprintf("DELETE FROM %s %s", table, whereSQL), values...)
-	return err
+	res, err := db.Exec(fmt.Sprintf("DELETE FROM %s %s", table, whereSQL), values...)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
-func (db *SQL) Update(table string, id int, m map[string]any) error {
+// Update updates rows based on a column and its value
+// 根据列和值更新行
+func (db *SQL) Update(table string, where *OrderedMap[string, any], m map[string]any) (int64, error) {
 	if len(m) == 0 {
-		return fmt.Errorf("no fields to update")
+		return 0, fmt.Errorf("no fields to update")
+	}
+	if where == nil {
+		where = NewOrderedMap[string, any]()
 	}
 
 	setClauses := make([]string, 0, len(m))
 	values := make([]any, 0, len(m))
-	var idValue any = id
 
 	for column, value := range m {
 		setClauses = append(setClauses, fmt.Sprintf("%s = ?", column))
 		values = append(values, value)
 	}
 
-	if idValue == nil {
-		return fmt.Errorf("id value is required for update")
+	whereClauses := make([]string, 0, where.Len())
+	whereValues := make([]any, 0, where.Len())
+	for k, v := range where.All() {
+		whereClauses = append(whereClauses, k)
+		whereValues = append(whereValues, v)
+	}
+
+	var whereSQL string
+	if len(whereClauses) > 0 {
+		whereSQL = "WHERE " + strings.Join(whereClauses, " ")
 	}
 
 	query := fmt.Sprintf(
-		"UPDATE %s SET %s WHERE id = ?",
+		"UPDATE %s SET %s WHERE %s",
 		table,
 		strings.Join(setClauses, ", "),
+		whereSQL,
 	)
 
-	values = append(values, idValue) // id value goes last for where clause
-	_, err := db.Exec(query, values...)
-	return err
+	values = append(values, whereValues...) // where values go last for where clause
+	res, err := db.Exec(query, values...)
+	if err != nil {
+		return 0, err
+	}
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return rowsAffected, nil
 }
 
 func List[T Row](where string, args []any, newRow func() T) ([]T, error) {
