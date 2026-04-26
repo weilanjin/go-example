@@ -9,7 +9,6 @@ import (
 )
 
 type Row interface {
-	TableName() string
 	Mapping() []*Mapping
 }
 
@@ -19,10 +18,12 @@ type Mapping struct {
 	Value  any // insert, update value
 }
 
-type Where []struct {
+type Where struct {
 	Clause string
 	Value  any
 }
+
+type Wheres []Where
 
 type SQL struct {
 	*sql.DB
@@ -37,7 +38,7 @@ func NewSQL(db *sql.DB) *SQL {
 
 // Insert inserts rows while ignoring specified columns
 // 批量插入数据时忽略指定的列
-func (db *SQL) Insert(ctx context.Context, omits []string, rows ...Row) (int64, error) {
+func (db *SQL) Insert(ctx context.Context, table string, omits []string, rows ...Row) (int64, error) {
 	if len(rows) == 0 {
 		return 0, fmt.Errorf("no rows to insert")
 	}
@@ -48,7 +49,7 @@ func (db *SQL) Insert(ctx context.Context, omits []string, rows ...Row) (int64, 
 	}
 
 	row := rows[0]
-	table, mappings := row.TableName(), row.Mapping()
+	mappings := row.Mapping()
 
 	columns := make([]string, 0, len(mappings))
 	for _, m := range mappings {
@@ -104,7 +105,7 @@ func (db *SQL) Insert(ctx context.Context, omits []string, rows ...Row) (int64, 
 
 // Delete deletes rows based on a column and its value
 // 根据列和值删除行
-func (db *SQL) Delete(ctx context.Context, table string, where Where) (int64, error) {
+func (db *SQL) Delete(ctx context.Context, table string, where Wheres) (int64, error) {
 	whereClauses := make([]string, 0, len(where))
 	values := make([]any, 0, len(where))
 
@@ -129,15 +130,15 @@ func (db *SQL) Delete(ctx context.Context, table string, where Where) (int64, er
 
 // Update updates rows based on a column and its value
 // 根据列和值更新行
-func (db *SQL) Update(ctx context.Context, table string, where Where, m map[string]any) (int64, error) {
-	if len(m) == 0 {
+func (db *SQL) Update(ctx context.Context, table string, where Wheres, update map[string]any) (int64, error) {
+	if len(update) == 0 {
 		return 0, fmt.Errorf("no fields to update")
 	}
 
-	setClauses := make([]string, 0, len(m))
-	values := make([]any, 0, len(m))
+	setClauses := make([]string, 0, len(update))
+	values := make([]any, 0, len(update))
 
-	for column, value := range m {
+	for column, value := range update {
 		setClauses = append(setClauses, fmt.Sprintf("%s = ?", column))
 		values = append(values, value)
 	}
@@ -175,11 +176,40 @@ func (db *SQL) Update(ctx context.Context, table string, where Where, m map[stri
 	return rowsAffected, nil
 }
 
-func List[T Row](ctx context.Context, where Where, args []any, newRow func() T) ([]T, error) {
+func (db *SQL) QueryRow(ctx context.Context, table string, query Query) (Row, error) {
+	query.Limit = 1
+
+	rows, err := db.Query(ctx, table, query)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no rows found")
+	}
+	return rows[0], nil
+}
+
+type Query struct {
+	NewRow  func() Row // 如何创建对象
+	Where   Wheres     // 过滤条件
+	OrderBy string     // 排序条件，例如 "created_at DESC"
+	Limit   int        // 返回的最大行数，0表示不限制
+	Offset  int        // 分页偏移量，0表示不偏移
+}
+
+// List queries rows with support for filtering, sorting, and pagination
+// 支持过滤、排序和分页的查询方法
+func (db *SQL) Query(ctx context.Context, table string, query Query) ([]Row, error) {
+	if query.NewRow == nil {
+		return nil, fmt.Errorf("NewRow function is required")
+	}
+
+	// Build WHERE clause / 构建WHERE子句
 	var whereSQL string
-	if len(where) > 0 {
-		whereClauses := make([]string, 0, len(where))
-		for _, w := range where {
+	var args []any
+	if len(query.Where) > 0 {
+		whereClauses := make([]string, 0, len(query.Where))
+		for _, w := range query.Where {
 			whereClauses = append(whereClauses, w.Clause)
 			if w.Value != nil {
 				args = append(args, w.Value)
@@ -188,29 +218,41 @@ func List[T Row](ctx context.Context, where Where, args []any, newRow func() T) 
 		whereSQL = "WHERE " + strings.Join(whereClauses, " AND ")
 	}
 
-	prototype := newRow()
+	prototype := query.NewRow()
 	mappings := prototype.Mapping()
 	columns := make([]string, len(mappings))
 	for i, m := range mappings {
 		columns[i] = m.Column
 	}
 
-	query := fmt.Sprintf(
+	// Build query with ORDER BY and LIMIT / 构建带排序和分页的查询语句
+	sqlText := fmt.Sprintf(
 		"SELECT %s FROM %s %s",
 		strings.Join(columns, ", "),
-		prototype.TableName(),
+		table,
 		whereSQL,
 	)
 
-	rows, err := db.QueryContext(ctx, query, args...)
+	if query.OrderBy != "" {
+		sqlText += " ORDER BY " + query.OrderBy
+	}
+
+	if query.Limit > 0 {
+		sqlText += fmt.Sprintf(" LIMIT %d", query.Limit)
+		if query.Offset > 0 {
+			sqlText += fmt.Sprintf(" OFFSET %d", query.Offset)
+		}
+	}
+
+	rows, err := db.QueryContext(ctx, sqlText, args...)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	results := make([]T, 0)
+	results := make([]Row, 0)
 	for rows.Next() {
-		item := newRow()
+		item := query.NewRow()
 		itemMappings := item.Mapping()
 		scanArgs := make([]any, len(itemMappings))
 		for i, m := range itemMappings {
