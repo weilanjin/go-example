@@ -57,9 +57,9 @@ func TestQueryRow(t *testing.T) {
 		},
 	}
 
-	row, err := db.QueryRow(context.Background(), "your_table_name", query)
+	row, err := db.FindOne(context.Background(), "your_table_name", query)
 	if err != nil {
-		t.Fatalf("QueryRow failed: %v", err)
+		t.Fatalf("FindOne failed: %v", err)
 	}
 	t.Logf("Queried row: %+v", row)
 }

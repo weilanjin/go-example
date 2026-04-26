@@ -4,8 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"slices"
 	"strings"
+	"time"
 )
 
 type Row interface {
@@ -34,6 +36,34 @@ type SQL struct {
 
 func NewSQL(db *sql.DB) *SQL {
 	return &SQL{DB: db}
+}
+
+// execContext wraps ExecContext with debug logging and slow SQL detection
+// 封装 ExecContext，支持调试日志和慢 SQL 检测
+func (db *SQL) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	if db.Debug {
+		log.Printf("[SQL] exec: %s args: %v", query, args)
+	}
+	start := time.Now()
+	res, err := db.DB.ExecContext(ctx, query, args...)
+	if elapsed := time.Since(start); db.SlowSQLThreshold > 0 && elapsed.Milliseconds() >= int64(db.SlowSQLThreshold) {
+		log.Printf("[SlowSQL] %dms exec: %s args: %v", elapsed.Milliseconds(), query, args)
+	}
+	return res, err
+}
+
+// queryContext wraps QueryContext with debug logging and slow SQL detection
+// 封装 QueryContext，支持调试日志和慢 SQL 检测
+func (db *SQL) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	if db.Debug {
+		log.Printf("[SQL] query: %s args: %v", query, args)
+	}
+	start := time.Now()
+	rows, err := db.DB.QueryContext(ctx, query, args...)
+	if elapsed := time.Since(start); db.SlowSQLThreshold > 0 && elapsed.Milliseconds() >= int64(db.SlowSQLThreshold) {
+		log.Printf("[SlowSQL] %dms query: %s args: %v", elapsed.Milliseconds(), query, args)
+	}
+	return rows, err
 }
 
 // Insert inserts rows while ignoring specified columns
@@ -89,7 +119,7 @@ func (db *SQL) Insert(ctx context.Context, table string, omits []string, rows ..
 			strings.Join(placeholders, ", "),
 		)
 
-		res, err := db.ExecContext(ctx, query, values...)
+		res, err := db.execContext(ctx, query, values...)
 		if err != nil {
 			return 0, err
 		}
@@ -121,7 +151,7 @@ func (db *SQL) Delete(ctx context.Context, table string, where Wheres) (int64, e
 		whereSQL = "WHERE " + strings.Join(whereClauses, " ")
 	}
 
-	res, err := db.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s %s", table, whereSQL), values...)
+	res, err := db.execContext(ctx, fmt.Sprintf("DELETE FROM %s %s", table, whereSQL), values...)
 	if err != nil {
 		return 0, err
 	}
@@ -165,7 +195,7 @@ func (db *SQL) Update(ctx context.Context, table string, where Wheres, update ma
 	)
 
 	values = append(values, whereValues...) // where values go last for where clause
-	res, err := db.ExecContext(ctx, query, values...)
+	res, err := db.execContext(ctx, query, values...)
 	if err != nil {
 		return 0, err
 	}
@@ -176,10 +206,10 @@ func (db *SQL) Update(ctx context.Context, table string, where Wheres, update ma
 	return rowsAffected, nil
 }
 
-func (db *SQL) QueryRow(ctx context.Context, table string, query Query) (Row, error) {
+func (db *SQL) FindOne(ctx context.Context, table string, query Query) (Row, error) {
 	query.Limit = 1
 
-	rows, err := db.Query(ctx, table, query)
+	rows, err := db.Find(ctx, table, query)
 	if err != nil {
 		return nil, err
 	}
@@ -197,9 +227,9 @@ type Query struct {
 	Offset  int        // 分页偏移量，0表示不偏移
 }
 
-// List queries rows with support for filtering, sorting, and pagination
+// Find queries rows with support for filtering, sorting, and pagination
 // 支持过滤、排序和分页的查询方法
-func (db *SQL) Query(ctx context.Context, table string, query Query) ([]Row, error) {
+func (db *SQL) Find(ctx context.Context, table string, query Query) ([]Row, error) {
 	if query.NewRow == nil {
 		return nil, fmt.Errorf("NewRow function is required")
 	}
@@ -244,7 +274,7 @@ func (db *SQL) Query(ctx context.Context, table string, query Query) ([]Row, err
 		}
 	}
 
-	rows, err := db.QueryContext(ctx, sqlText, args...)
+	rows, err := db.queryContext(ctx, sqlText, args...)
 	if err != nil {
 		return nil, err
 	}
