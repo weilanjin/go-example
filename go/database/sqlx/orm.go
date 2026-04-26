@@ -1,6 +1,7 @@
 package sqlx
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"slices"
@@ -36,7 +37,7 @@ func NewSQL(db *sql.DB) *SQL {
 
 // Insert inserts rows while ignoring specified columns
 // 批量插入数据时忽略指定的列
-func (db *SQL) Insert(omits []string, rows ...Row) (int64, error) {
+func (db *SQL) Insert(ctx context.Context, omits []string, rows ...Row) (int64, error) {
 	if len(rows) == 0 {
 		return 0, fmt.Errorf("no rows to insert")
 	}
@@ -87,7 +88,7 @@ func (db *SQL) Insert(omits []string, rows ...Row) (int64, error) {
 			strings.Join(placeholders, ", "),
 		)
 
-		res, err := db.Exec(query, values...)
+		res, err := db.ExecContext(ctx, query, values...)
 		if err != nil {
 			return 0, err
 		}
@@ -103,7 +104,7 @@ func (db *SQL) Insert(omits []string, rows ...Row) (int64, error) {
 
 // Delete deletes rows based on a column and its value
 // 根据列和值删除行
-func (db *SQL) Delete(table string, where Where) (int64, error) {
+func (db *SQL) Delete(ctx context.Context, table string, where Where) (int64, error) {
 	whereClauses := make([]string, 0, len(where))
 	values := make([]any, 0, len(where))
 
@@ -119,7 +120,7 @@ func (db *SQL) Delete(table string, where Where) (int64, error) {
 		whereSQL = "WHERE " + strings.Join(whereClauses, " ")
 	}
 
-	res, err := db.Exec(fmt.Sprintf("DELETE FROM %s %s", table, whereSQL), values...)
+	res, err := db.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s %s", table, whereSQL), values...)
 	if err != nil {
 		return 0, err
 	}
@@ -128,7 +129,7 @@ func (db *SQL) Delete(table string, where Where) (int64, error) {
 
 // Update updates rows based on a column and its value
 // 根据列和值更新行
-func (db *SQL) Update(table string, where Where, m map[string]any) (int64, error) {
+func (db *SQL) Update(ctx context.Context, table string, where Where, m map[string]any) (int64, error) {
 	if len(m) == 0 {
 		return 0, fmt.Errorf("no fields to update")
 	}
@@ -163,7 +164,7 @@ func (db *SQL) Update(table string, where Where, m map[string]any) (int64, error
 	)
 
 	values = append(values, whereValues...) // where values go last for where clause
-	res, err := db.Exec(query, values...)
+	res, err := db.ExecContext(ctx, query, values...)
 	if err != nil {
 		return 0, err
 	}
@@ -174,7 +175,7 @@ func (db *SQL) Update(table string, where Where, m map[string]any) (int64, error
 	return rowsAffected, nil
 }
 
-func List[T Row](where Where, args []any, newRow func() T) ([]T, error) {
+func List[T Row](ctx context.Context, where Where, args []any, newRow func() T) ([]T, error) {
 	var whereSQL string
 	if len(where) > 0 {
 		whereClauses := make([]string, 0, len(where))
@@ -201,7 +202,7 @@ func List[T Row](where Where, args []any, newRow func() T) ([]T, error) {
 		whereSQL,
 	)
 
-	rows, err := db.Query(query, args...)
+	rows, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
