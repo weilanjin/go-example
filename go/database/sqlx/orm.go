@@ -27,11 +27,27 @@ type Where struct {
 
 type Wheres []Where
 
+type printCtxKey struct{}
+
+var PrintCtxKey = printCtxKey{}
+
+func WithPrintCtx(ctx context.Context) context.Context {
+	return context.WithValue(ctx, PrintCtxKey, struct{}{})
+}
+
+func isPrintCtx(ctx context.Context) bool {
+	v := ctx.Value(PrintCtxKey)
+	if v == nil {
+		return false
+	}
+	_, ok := v.(struct{})
+	return ok
+}
+
 type SQL struct {
 	*sql.DB
-	BatchSize        int  // 批量插入的大小，默认为一次性插入所有行
-	SlowSQLThreshold int  // 单位毫秒，超过该值的 SQL 将被记录为慢 SQL
-	Debug            bool // 是否启用调试模式，打印 SQL 语句和参数
+	BatchSize        int // 批量插入的大小，默认为一次性插入所有行
+	SlowSQLThreshold int // 单位毫秒，超过该值的 SQL 将被记录为慢 SQL
 }
 
 func NewSQL(db *sql.DB) *SQL {
@@ -41,7 +57,7 @@ func NewSQL(db *sql.DB) *SQL {
 // execContext wraps ExecContext with debug logging and slow SQL detection
 // 封装 ExecContext，支持调试日志和慢 SQL 检测
 func (db *SQL) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	if db.Debug {
+	if isPrintCtx(ctx) {
 		log.Printf("[SQL] exec: %s args: %v", query, args)
 	}
 	start := time.Now()
@@ -55,7 +71,7 @@ func (db *SQL) execContext(ctx context.Context, query string, args ...any) (sql.
 // queryContext wraps QueryContext with debug logging and slow SQL detection
 // 封装 QueryContext，支持调试日志和慢 SQL 检测
 func (db *SQL) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
-	if db.Debug {
+	if isPrintCtx(ctx) {
 		log.Printf("[SQL] query: %s args: %v", query, args)
 	}
 	start := time.Now()
@@ -64,6 +80,26 @@ func (db *SQL) queryContext(ctx context.Context, query string, args ...any) (*sq
 		log.Printf("[SlowSQL] %dms query: %s args: %v", elapsed.Milliseconds(), query, args)
 	}
 	return rows, err
+}
+
+func (db *SQL) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	if isPrintCtx(ctx) {
+		log.Printf("[SQL] query row: %s args: %v", query, args)
+	}
+	start := time.Now()
+	row := db.DB.QueryRowContext(ctx, query, args...)
+	if elapsed := time.Since(start); db.SlowSQLThreshold > 0 && elapsed.Milliseconds() >= int64(db.SlowSQLThreshold) {
+		log.Printf("[SlowSQL] %dms query row: %s args: %v", elapsed.Milliseconds(), query, args)
+	}
+	return row
+}
+
+func (db *SQL) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	return db.queryContext(ctx, query, args...)
+}
+
+func (db *SQL) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return db.execContext(ctx, query, args...)
 }
 
 // Insert inserts rows while ignoring specified columns
