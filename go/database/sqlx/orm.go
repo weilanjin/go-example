@@ -27,16 +27,59 @@ type Where struct {
 
 type Wheres []Where
 
-type printCtxKey struct{}
+func (w *Wheres) And(clause string, value any) {
+	*w = append(*w, Where{Clause: "AND " + clause, Value: value})
+}
 
-var PrintCtxKey = printCtxKey{}
+func (w *Wheres) Or(clause string, value any) {
+	*w = append(*w, Where{Clause: "OR " + clause, Value: value})
+}
+
+func (w *Wheres) build() (string, []any) {
+	whereSQL, args := "", []any{}
+	if len(*w) == 0 {
+		return whereSQL, args
+	}
+
+	var whereClauses []string
+	for i, w := range *w {
+		clause := w.Clause
+		if i == 0 {
+			clause = strings.TrimPrefix(strings.TrimPrefix(clause, "AND "), "OR ")
+		}
+		whereClauses = append(whereClauses, clause)
+		if w.Value != nil {
+			args = append(args, w.Value)
+		}
+	}
+	if len(whereClauses) == 0 {
+		return whereSQL, args
+	}
+
+	whereSQL = "WHERE " + strings.Join(whereClauses, " ")
+	return whereSQL, args
+}
+
+type DB struct {
+	*sql.DB
+	BatchSize        int // 批量插入的大小，默认为一次性插入所有行
+	SlowSQLThreshold int // 单位毫秒，超过该值的 SQL 将被记录为慢 SQL
+}
+
+func NewSQL(db *sql.DB) *DB {
+	return &DB{DB: db}
+}
+
+type printCtx struct{}
+
+var printCtxKey = printCtx{}
 
 func WithPrintCtx(ctx context.Context) context.Context {
-	return context.WithValue(ctx, PrintCtxKey, struct{}{})
+	return context.WithValue(ctx, printCtxKey, struct{}{})
 }
 
 func isPrintCtx(ctx context.Context) bool {
-	v := ctx.Value(PrintCtxKey)
+	v := ctx.Value(printCtxKey)
 	if v == nil {
 		return false
 	}
@@ -44,19 +87,9 @@ func isPrintCtx(ctx context.Context) bool {
 	return ok
 }
 
-type SQL struct {
-	*sql.DB
-	BatchSize        int // 批量插入的大小，默认为一次性插入所有行
-	SlowSQLThreshold int // 单位毫秒，超过该值的 SQL 将被记录为慢 SQL
-}
-
-func NewSQL(db *sql.DB) *SQL {
-	return &SQL{DB: db}
-}
-
 // execContext wraps ExecContext with debug logging and slow SQL detection
 // 封装 ExecContext，支持调试日志和慢 SQL 检测
-func (db *SQL) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+func (db *DB) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	if isPrintCtx(ctx) {
 		log.Printf("[SQL] exec: %s args: %v", query, args)
 	}
@@ -70,7 +103,7 @@ func (db *SQL) execContext(ctx context.Context, query string, args ...any) (sql.
 
 // queryContext wraps QueryContext with debug logging and slow SQL detection
 // 封装 QueryContext，支持调试日志和慢 SQL 检测
-func (db *SQL) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+func (db *DB) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	if isPrintCtx(ctx) {
 		log.Printf("[SQL] query: %s args: %v", query, args)
 	}
@@ -82,7 +115,7 @@ func (db *SQL) queryContext(ctx context.Context, query string, args ...any) (*sq
 	return rows, err
 }
 
-func (db *SQL) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+func (db *DB) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
 	if isPrintCtx(ctx) {
 		log.Printf("[SQL] query row: %s args: %v", query, args)
 	}
@@ -94,17 +127,17 @@ func (db *SQL) QueryRowContext(ctx context.Context, query string, args ...any) *
 	return row
 }
 
-func (db *SQL) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+func (db *DB) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	return db.queryContext(ctx, query, args...)
 }
 
-func (db *SQL) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+func (db *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return db.execContext(ctx, query, args...)
 }
 
 // Insert inserts rows while ignoring specified columns
 // 批量插入数据时忽略指定的列
-func (db *SQL) Insert(ctx context.Context, table string, omits []string, rows ...Row) (int64, error) {
+func (db *DB) Insert(ctx context.Context, table string, omits []string, rows ...Row) (int64, error) {
 	if len(rows) == 0 {
 		return 0, fmt.Errorf("no rows to insert")
 	}
@@ -171,23 +204,9 @@ func (db *SQL) Insert(ctx context.Context, table string, omits []string, rows ..
 
 // Delete deletes rows based on a column and its value
 // 根据列和值删除行
-func (db *SQL) Delete(ctx context.Context, table string, where Wheres) (int64, error) {
-	whereClauses := make([]string, 0, len(where))
-	values := make([]any, 0, len(where))
-
-	for _, w := range where {
-		whereClauses = append(whereClauses, w.Clause)
-		if w.Value != nil {
-			values = append(values, w.Value)
-		}
-	}
-
-	var whereSQL string
-	if len(whereClauses) > 0 {
-		whereSQL = "WHERE " + strings.Join(whereClauses, " ")
-	}
-
-	res, err := db.execContext(ctx, fmt.Sprintf("DELETE FROM %s %s", table, whereSQL), values...)
+func (db *DB) Delete(ctx context.Context, table string, where Wheres) (int64, error) {
+	whereSQL, args := where.build()
+	res, err := db.execContext(ctx, fmt.Sprintf("DELETE FROM %s %s", table, whereSQL), args...)
 	if err != nil {
 		return 0, err
 	}
@@ -196,33 +215,19 @@ func (db *SQL) Delete(ctx context.Context, table string, where Wheres) (int64, e
 
 // Update updates rows based on a column and its value
 // 根据列和值更新行
-func (db *SQL) Update(ctx context.Context, table string, where Wheres, update map[string]any) (int64, error) {
+func (db *DB) Update(ctx context.Context, table string, where Wheres, update map[string]any) (int64, error) {
 	if len(update) == 0 {
 		return 0, fmt.Errorf("no fields to update")
 	}
 
 	setClauses := make([]string, 0, len(update))
 	values := make([]any, 0, len(update))
-
 	for column, value := range update {
 		setClauses = append(setClauses, fmt.Sprintf("%s = ?", column))
 		values = append(values, value)
 	}
 
-	whereClauses := make([]string, 0, len(where))
-	whereValues := make([]any, 0, len(where))
-	for _, w := range where {
-		whereClauses = append(whereClauses, w.Clause)
-		if w.Value != nil {
-			whereValues = append(whereValues, w.Value)
-		}
-	}
-
-	var whereSQL string
-	if len(whereClauses) > 0 {
-		whereSQL = "WHERE " + strings.Join(whereClauses, " ")
-	}
-
+	whereSQL, args := where.build()
 	query := fmt.Sprintf(
 		"UPDATE %s SET %s %s",
 		table,
@@ -230,7 +235,7 @@ func (db *SQL) Update(ctx context.Context, table string, where Wheres, update ma
 		whereSQL,
 	)
 
-	values = append(values, whereValues...) // where values go last for where clause
+	values = append(values, args...) // where values go last for where clause
 	res, err := db.execContext(ctx, query, values...)
 	if err != nil {
 		return 0, err
@@ -242,7 +247,7 @@ func (db *SQL) Update(ctx context.Context, table string, where Wheres, update ma
 	return rowsAffected, nil
 }
 
-func (db *SQL) FindOne(ctx context.Context, table string, query Query) (Row, error) {
+func (db *DB) FindOne(ctx context.Context, table string, query Query) (Row, error) {
 	query.Limit = 1
 
 	rows, err := db.Find(ctx, table, query)
@@ -265,24 +270,13 @@ type Query struct {
 
 // Find queries rows with support for filtering, sorting, and pagination
 // 支持过滤、排序和分页的查询方法
-func (db *SQL) Find(ctx context.Context, table string, query Query) ([]Row, error) {
+func (db *DB) Find(ctx context.Context, table string, query Query) ([]Row, error) {
 	if query.NewRow == nil {
 		return nil, fmt.Errorf("NewRow function is required")
 	}
 
 	// Build WHERE clause / 构建WHERE子句
-	var whereSQL string
-	var args []any
-	if len(query.Where) > 0 {
-		whereClauses := make([]string, 0, len(query.Where))
-		for _, w := range query.Where {
-			whereClauses = append(whereClauses, w.Clause)
-			if w.Value != nil {
-				args = append(args, w.Value)
-			}
-		}
-		whereSQL = "WHERE " + strings.Join(whereClauses, " AND ")
-	}
+	var whereSQL, args = query.Where.build()
 
 	prototype := query.NewRow()
 	mappings := prototype.Mapping()
@@ -335,6 +329,5 @@ func (db *SQL) Find(ctx context.Context, table string, query Query) ([]Row, erro
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-
 	return results, nil
 }
