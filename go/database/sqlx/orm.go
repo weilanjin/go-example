@@ -247,30 +247,32 @@ func (db *DB) Update(ctx context.Context, table string, where Wheres, update map
 	return rowsAffected, nil
 }
 
-func (db *DB) FindOne(ctx context.Context, table string, query Query) (Row, error) {
+type Query[T Row] struct {
+	NewRow  func() T // 如何创建对象
+	Where   Wheres   // 过滤条件
+	OrderBy string   // 排序条件，例如 "created_at DESC"
+	Limit   int      // 返回的最大行数，0表示不限制
+	Offset  int      // 分页偏移量，0表示不偏移
+}
+
+func FindOne[T Row](ctx context.Context, db *DB, table string, query Query[T]) (T, error) {
 	query.Limit = 1
 
-	rows, err := db.Find(ctx, table, query)
+	rows, err := Find(ctx, db, table, query)
 	if err != nil {
-		return nil, err
+		var zero T
+		return zero, err
 	}
 	if len(rows) == 0 {
-		return nil, fmt.Errorf("no rows found")
+		var zero T
+		return zero, fmt.Errorf("no rows found")
 	}
 	return rows[0], nil
 }
 
-type Query struct {
-	NewRow  func() Row // 如何创建对象
-	Where   Wheres     // 过滤条件
-	OrderBy string     // 排序条件，例如 "created_at DESC"
-	Limit   int        // 返回的最大行数，0表示不限制
-	Offset  int        // 分页偏移量，0表示不偏移
-}
-
 // Find queries rows with support for filtering, sorting, and pagination
 // 支持过滤、排序和分页的查询方法
-func (db *DB) Find(ctx context.Context, table string, query Query) ([]Row, error) {
+func Find[T Row](ctx context.Context, db *DB, table string, query Query[T]) ([]T, error) {
 	if query.NewRow == nil {
 		return nil, fmt.Errorf("NewRow function is required")
 	}
@@ -310,7 +312,7 @@ func (db *DB) Find(ctx context.Context, table string, query Query) ([]Row, error
 	}
 	defer rows.Close()
 
-	results := make([]Row, 0)
+	results := make([]T, 0)
 	for rows.Next() {
 		item := query.NewRow()
 		itemMappings := item.Mapping()

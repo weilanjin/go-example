@@ -48,8 +48,8 @@ func TestDelete(t *testing.T) {
 
 func TestQueryRow(t *testing.T) {
 	db := NewSQL(nil)
-	query := Query{
-		NewRow: func() Row {
+	query := Query[*User]{
+		NewRow: func() *User {
 			return &User{} // 替换为你的结构体类型
 		},
 		Where: Wheres{
@@ -57,7 +57,7 @@ func TestQueryRow(t *testing.T) {
 		},
 	}
 
-	row, err := db.FindOne(context.Background(), "your_table_name", query)
+	row, err := FindOne(context.Background(), db, "your_table_name", query)
 	if err != nil {
 		t.Fatalf("FindOne failed: %v", err)
 	}
