@@ -8,7 +8,56 @@ import (
 	"slices"
 	"strings"
 	"time"
+	//_ "github.com/go-sql-driver/mys//ql"
 )
+
+type DBConfig struct {
+	DSN         string        `yaml:"dsn"`
+	Timeout     time.Duration `yaml:"timeout"`
+	MaxOpenConn int           `yaml:"max_open_conn"`
+	MaxIdleConn int           `yaml:"max_idle_conn"`
+	MaxLifeTime time.Duration `yaml:"max_life_time"`
+	MaxIdleTime time.Duration `yaml:"max_idle_time"`
+
+	BatchSize        int `yaml:"batch_size"`         // 批量插入的大小，默认为一次性插入所有行
+	SlowSQLThreshold int `yaml:"slow_sql_threshold"` // 单位毫秒，超过该值的 SQL 将被记录为慢 SQL
+}
+
+func NewDB(conf *DBConfig) *DB {
+	if conf.Timeout <= 0 {
+		conf.Timeout = 5 * time.Second
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), conf.Timeout)
+	defer cancel()
+
+	var err error
+	sqlDB, err := sql.Open("mysql", conf.DSN)
+	if err != nil {
+		log.Fatalf("failed to connect to database: %v", err)
+		return nil
+	}
+	// 影响最大并发数。
+	// 过大可能导致数据库负载过高，过小会限制并发性能。
+	//一般设置在 100~500，具体根据数据库负载情况调整。
+	sqlDB.SetMaxOpenConns(conf.MaxOpenConn) // 设置最大连接数
+	// 控制保持在池中的空闲连接数。
+	// 过大会浪费资源，过小可能导致频繁创建连接，增加延迟。
+	// 典型范围是 10~50。
+	sqlDB.SetMaxIdleConns(conf.MaxIdleConn) // 设置闲置连接数
+	// 控制连接存活的最大时间，避免连接长时间占用资源导致 MySQL 关闭连接。
+	// 建议设置 30min ~ 1h，防止连接泄露。
+	sqlDB.SetConnMaxLifetime(conf.MaxLifeTime) // 连接的最大可复用时间
+	// 控制空闲连接的最长时间，防止长期空闲的连接占用资源。
+	// 典型值 10min，根据业务需求调整。
+	sqlDB.SetConnMaxIdleTime(conf.MaxIdleTime) // 空闲连接的最大生存时间
+
+	if err := sqlDB.PingContext(ctx); err != nil {
+		log.Fatalf("failed to ping database: %v", err)
+		return nil
+	}
+	return NewSQL(sqlDB, conf.BatchSize, conf.SlowSQLThreshold)
+}
 
 type Row interface {
 	Mapping() []*Mapping
@@ -66,8 +115,12 @@ type DB struct {
 	SlowSQLThreshold int // 单位毫秒，超过该值的 SQL 将被记录为慢 SQL
 }
 
-func NewSQL(db *sql.DB) *DB {
-	return &DB{DB: db}
+func NewSQL(db *sql.DB, batchSize, slowSQLThreshold int) *DB {
+	return &DB{
+		DB:               db,
+		BatchSize:        batchSize,
+		SlowSQLThreshold: slowSQLThreshold,
+	}
 }
 
 type printCtx struct{}
@@ -222,6 +275,7 @@ func (db *DB) Update(ctx context.Context, table string, where Wheres, update map
 
 	setClauses := make([]string, 0, len(update))
 	values := make([]any, 0, len(update))
+
 	for column, value := range update {
 		setClauses = append(setClauses, fmt.Sprintf("%s = ?", column))
 		values = append(values, value)
